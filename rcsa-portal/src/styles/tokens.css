@@ -1,0 +1,23 @@
+/* Design tokens — lifted verbatim from the prototype :root (New Version.html L26-33) */
+:root {
+  --bg-main: #f5fbff;
+  --bg-card: #ffffff;
+  --bg-surface: #eef7ff;
+  --bg-surface-2: #eaf0ff;
+  --border: #c7d7ea;
+  --border-strong: #9db4d0;
+  --accent: #00b8d9;
+  --accent-soft: #d7f8ff;
+  --accent-2: #8b5cf6;
+  --accent-2-soft: #efe7ff;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --critical: #dc2626;
+  --critical-soft: #fee2e2;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --blue: var(--accent);
+  --red: var(--critical);
+}

@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Internal RCSA Portal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root { --blue:#2563eb; --red:#dc2626; }
+  .active-row { background:#eff6ff !important; border-left:4px solid var(--blue); }
+  .modal-bg { background:rgba(15,23,42,.55); }
+  .badge { padding:.18rem .55rem; border-radius:999px; font-size:.7rem; font-weight:700; display:inline-block; }
+  .risk-row:hover { background:#f9fafb; cursor:pointer; }
+  .asset-row:hover { background:#f9fafb; cursor:pointer; }
+  .tab-btn { padding:.4rem 1rem; border-bottom:2px solid transparent; font-size:.85rem; font-weight:600; color:#6b7280; transition:all .15s; }
+  .tab-btn.active { border-color:var(--blue); color:var(--blue); }
+
+  .modal-back-btn { display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--border); background:rgba(255,255,255,.82); color:var(--text-main); padding:.35rem .7rem; border-radius:.55rem; font-size:.78rem; font-weight:700; box-shadow:0 8px 18px rgba(15,23,42,.045); }
+  .modal-back-btn:hover { transform:translateY(-1px); filter:brightness(1.03); }
+  .heat-cell { width:52px; height:42px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.8rem; cursor:default; }
+  input:focus,select:focus,textarea:focus { outline:2px solid var(--blue); outline-offset:1px; }
+  .comment-bubble { background:#f1f5f9; border-radius:8px; padding:.5rem .75rem; font-size:.82rem; }
+  .section-card { background:#fff; border-radius:.5rem; box-shadow:0 1px 3px rgba(0,0,0,.1); overflow:hidden; }
+
+  /* Futuristic Light Cyber Theme */
+  :root {
+    --bg-main:#F5FBFF; --bg-card:#FFFFFF; --bg-surface:#EEF7FF; --bg-surface-2:#EAF0FF;
+    --border:#C7D7EA; --border-strong:#9DB4D0; --accent:#00B8D9; --accent-soft:#D7F8FF;
+    --accent-2:#8B5CF6; --accent-2-soft:#EFE7FF; --success:#16A34A; --success-soft:#DCFCE7;
+    --warning:#D97706; --warning-soft:#FEF3C7; --critical:#DC2626; --critical-soft:#FEE2E2;
+    --text-main:#0F172A; --text-muted:#64748B; --blue:var(--accent); --red:var(--critical);
+  }
+
+  html { background:var(--bg-main); }
+  body {
+    background: radial-gradient(circle at 10% 0%, rgba(0,184,217,.22), transparent 28rem),
+      radial-gradient(circle at 90% 4%, rgba(139,92,246,.18), transparent 30rem),
+      linear-gradient(180deg, #F8FDFF 0%, #F1F7FF 48%, #F8FAFF 100%) !important;
+    color:var(--text-main) !important;
+  }
+
+  .section-card, #dashboard-cards > div, .chart-container, #empty-risk-message, #asset-detail,
+  #asset-modal > div, #risk-modal > div, #heatmap-modal > div, #confirm-modal > div {
+    background:rgba(255,255,255,.86) !important; border:1px solid rgba(199,215,234,.95) !important;
+    box-shadow:0 18px 45px rgba(15,23,42,.08), 0 1px 0 rgba(255,255,255,.9) inset !important;
+    color:var(--text-main) !important; backdrop-filter:blur(14px);
+  }
+
+  .section-card, .chart-container { border-radius:18px; }
+  #dashboard-cards > div { border-radius:18px; }
+  #dashboard-cards > div:hover, .section-card:hover, .chart-container:hover { box-shadow:0 22px 55px rgba(15,23,42,.11), 0 0 0 1px rgba(0,184,217,.20) inset !important; }
+
+  .bg-gray-50, .bg-gray-100, .bg-white, .bg-orange-50, .bg-green-50, .bg-blue-50 { background-color:rgba(238,247,255,.78) !important; }
+  .border, .border-b, .border-t, .border-blue-100, .border-blue-200, .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color:var(--border) !important; }
+  .text-gray-800, .text-gray-700, .text-gray-600, .text-blue-700, .text-blue-800, .text-blue-600 { color:var(--text-main) !important; }
+  .text-gray-500, .text-gray-400 { color:var(--text-muted) !important; }
+  .text-orange-800 { color:var(--warning) !important; } .text-green-800 { color:var(--success) !important; }
+
+  h1, h2, h3, h4 { color:var(--text-main) !important; letter-spacing:-.015em; }
+  h1 { background:linear-gradient(90deg, #0F172A, #00B8D9 45%, #8B5CF6 78%); -webkit-background-clip:text; background-clip:text; color:transparent !important; }
+  #selected-asset-name, #global-filter-banner-text { color:var(--accent) !important; font-weight:bold; }
+
+  table { color:var(--text-main); }
+  thead, thead.bg-gray-100 { background:linear-gradient(90deg, rgba(215,248,255,.92), rgba(239,231,255,.86)) !important; color:var(--text-muted) !important; }
+  tbody tr { border-color:rgba(199,215,234,.8) !important; }
+  .asset-row:hover, .risk-row:hover { background:rgba(215,248,255,.56) !important; }
+  .active-row { background:linear-gradient(90deg, rgba(215,248,255,.88), rgba(239,231,255,.70)) !important; border-left:4px solid var(--accent) !important; }
+
+  input, select, textarea { background:rgba(255,255,255,.92) !important; border-color:var(--border) !important; color:var(--text-main) !important; caret-color:var(--accent); box-shadow:0 1px 0 rgba(255,255,255,.9) inset; }
+  input::placeholder, textarea::placeholder { color:rgba(100,116,139,.72) !important; }
+  input:focus, select:focus, textarea:focus { outline:2px solid rgba(0,184,217,.72) !important; box-shadow:0 0 0 4px rgba(0,184,217,.14), 0 0 24px rgba(139,92,246,.10) !important; }
+  option { background:#FFFFFF; color:var(--text-main); }
+
+  button { transition:all .18s ease; }
+  button.bg-blue-600, button[type="submit"] { background:linear-gradient(135deg, #00B8D9, #38BDF8) !important; color:#FFFFFF !important; border:0 !important; box-shadow:0 12px 24px rgba(0,184,217,.22) !important; }
+  button.bg-red-600, button[onclick="openRiskModal()"], #confirm-ok { background:linear-gradient(135deg, #8B5CF6, #00B8D9) !important; color:#FFFFFF !important; box-shadow:0 12px 24px rgba(139,92,246,.20) !important; }
+  button.bg-white, button.border, button.px-4.py-2.border, button.px-3.py-1\.5, button.px-3.py-2 { background:rgba(255,255,255,.82) !important; color:var(--text-main) !important; border-color:var(--border) !important; box-shadow:0 8px 18px rgba(15,23,42,.045) !important; }
+  button:hover { transform:translateY(-1px); filter:brightness(1.03); }
+
+  .badge { border:1px solid rgba(148,163,184,.25); box-shadow:0 1px 0 rgba(255,255,255,.8) inset; }
+  .bg-green-100 { background:var(--success-soft) !important; } .text-green-700, .text-green-800 { color:var(--success) !important; }
+  .bg-yellow-100, .bg-orange-100 { background:var(--warning-soft) !important; } .text-yellow-800, .text-orange-600, .text-orange-800 { color:var(--warning) !important; }
+  .bg-red-100 { background:var(--critical-soft) !important; } .text-red-500, .text-red-600, .text-red-700, .text-red-800 { color:var(--critical) !important; }
+  .bg-blue-100, .bg-sky-100 { background:var(--accent-soft) !important; } .text-sky-800 { color:var(--accent) !important; }
+  .bg-purple-100 { background:var(--accent-2-soft) !important; } .text-purple-800 { color:var(--accent-2) !important; }
+  .bg-gray-100, .bg-gray-200 { background:rgba(226,232,240,.82) !important; } .text-gray-600, .text-gray-700 { color:var(--text-muted) !important; }
+
+  .modal-bg { background:rgba(15,23,42,.30) !important; backdrop-filter:blur(12px); }
+  .sticky.top-0 { background:rgba(255,255,255,.90) !important; backdrop-filter:blur(14px); }
+  .chart-container { padding: 1rem; height: 260px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;}
+  .chart-overlay { position: absolute; inset: 0; border-radius: 18px; transition: background 0.2s; pointer-events: none;}
+  .chart-container:hover .chart-overlay { background: rgba(0,184,217,0.03); }
+  #global-filter-banner { display: none; background: linear-gradient(90deg, rgba(215,248,255,.88), rgba(239,231,255,.70)); border: 1px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; align-items: center; justify-content: space-between; }
+
+
+  /* Small performance and accessibility optimizations */
+  .section-card, .chart-container { content-visibility:auto; contain-intrinsic-size:1px 320px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; scroll-behavior:auto !important; } button:hover { transform:none !important; } }
+
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+<div class="max-w-7xl mx-auto p-4 space-y-4">
+
+  <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">RCSA Portal</h1>
+      <p class="text-xs text-gray-500">Asset catalogue · Risk register · Treatment workflow · Controls · Approvals · Reporting</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button onclick="openAssetModal()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow hover:bg-blue-700">+ New Asset</button>
+      <button onclick="exportAssetsCsv()" class="bg-white border px-3 py-2 rounded text-sm hover:bg-gray-50">Export Assets CSV</button>
+      <button onclick="exportRisksCsv()" class="bg-white border px-3 py-2 rounded text-sm hover:bg-gray-50">Export Risks CSV</button>
+    </div>
+  </div>
+
+  <div id="dashboard-cards" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3"></div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+    <div class="chart-container" title="Click a bar to filter Assets"><canvas id="chartAssetCrit"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a segment to filter Risks"><canvas id="chartTreatment"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a bubble to filter Risks"><canvas id="chartHeatmap"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a bar to filter Risks"><canvas id="chartDeptRisk"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a bar to filter Risks"><canvas id="chartTopThreats"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a bar to filter Overdue Actions"><canvas id="chartOverdue"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a segment to filter Accepted Risks"><canvas id="chartAccepted"></canvas><div class="chart-overlay"></div></div>
+    <div class="chart-container" title="Click a bar to filter by Control gaps"><canvas id="chartControlGap"></canvas><div class="chart-overlay"></div></div>
+  </div>
+
+  <div id="global-filter-banner" class="flex shadow-sm">
+    <div>
+      <span class="text-sm text-gray-600">Currently viewing: </span>
+      <span id="global-filter-banner-text" class="text-lg"></span>
+    </div>
+    <button onclick="clearGlobalFilter()" class="bg-white border border-gray-300 text-gray-600 px-3 py-1 rounded text-sm hover:bg-gray-50 font-semibold shadow-sm">Clear Global Filter</button>
+  </div>
+
+  <div id="asset-section" class="section-card">
+    <div class="px-5 py-4 border-b bg-gray-50">
+      <div class="flex flex-col gap-3">
+        <h2 class="text-base font-semibold text-gray-800">1. Asset Catalog</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
+          <input id="asset-search" oninput="debouncedRenderAssets()" class="border rounded px-2 py-1.5 text-sm col-span-2 md:col-span-1" placeholder="Search…">
+          <select id="asset-value-filter" onchange="applyAssetPresetFilter()" class="border rounded px-2 py-1.5 text-sm bg-white">
+            <option value="all">All values</option><option value="low">Low (1–6)</option><option value="medium">Medium (7–19)</option><option value="high">High (20–27)</option><option value="custom">Custom range</option>
+          </select>
+          <input id="asset-min-value" type="number" min="1" max="27" oninput="debouncedRenderAssets()" class="border rounded px-2 py-1.5 text-sm" placeholder="Min">
+          <input id="asset-max-value" type="number" min="1" max="27" oninput="debouncedRenderAssets()" class="border rounded px-2 py-1.5 text-sm" placeholder="Max">
+          <select id="asset-criticality-filter" onchange="renderAssets()" class="border rounded px-2 py-1.5 text-sm bg-white">
+            <option value="">All criticality</option><option>Low</option><option>Medium</option><option>High</option>
+          </select>
+          <select id="asset-pci-filter" onchange="renderAssets()" class="border rounded px-2 py-1.5 text-sm bg-white">
+            <option value="">PCI: All</option><option value="Yes">PCI: Yes</option><option value="No">PCI: No</option>
+          </select>
+          <button onclick="clearAssetFilters()" class="border rounded px-2 py-1.5 text-sm hover:bg-gray-100 text-gray-600">Reset Locals</button>
+        </div>
+      </div>
+    </div>
+    <div id="asset-filter-summary" class="hidden px-5 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-800"></div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-3 text-left">Asset #</th>
+            <th class="px-4 py-3 text-left">Name / Process</th>
+            <th class="px-4 py-3 text-left">Owners</th>
+            <th class="px-4 py-3 text-center">C – I – A</th>
+            <th class="px-4 py-3 text-center">Value</th>
+            <th class="px-4 py-3 text-left">Tags</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="asset-tbody" class="divide-y divide-gray-100"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="asset-detail" class="hidden section-card p-5 mt-4"></div>
+
+  <div id="risk-section" class="hidden section-card mt-4">
+    <div class="px-5 py-4 border-b bg-gray-50 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+      <div>
+        <h2 class="text-base font-semibold text-gray-800">2. Risk Register</h2>
+        <p class="text-xs text-gray-500 mt-0.5"><span id="selected-asset-name" class="font-bold text-blue-600"></span></p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <select id="risk-level-filter" onchange="renderRisks()" class="border rounded px-2 py-1.5 text-sm bg-white">
+          <option value="">All levels</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+        </select>
+        <select id="risk-status-filter" onchange="renderRisks()" class="border rounded px-2 py-1.5 text-sm bg-white">
+          <option value="">All status</option><option>Open</option><option>In Progress</option><option>Completed</option><option>Overdue</option>
+        </select>
+        <select id="risk-assessment-filter" onchange="renderRisks()" class="border rounded px-2 py-1.5 text-sm bg-white">
+          <option value="">All decisions</option><option>Mitigate</option><option>Accept</option><option>Transfer</option><option>Avoid</option>
+        </select>
+        <button onclick="showRiskHeatMapModal()" class="bg-white border px-3 py-1.5 text-sm rounded hover:bg-gray-50">Grid View</button>
+        <button onclick="openRiskModal()" class="bg-red-600 text-white px-3 py-1.5 text-sm rounded shadow hover:bg-red-700 font-semibold">+ Log Risk</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-3 text-left">Risk #</th>
+            <th class="px-4 py-3 text-left">Asset</th>
+            <th class="px-4 py-3 text-left">Threat</th>
+            <th class="px-4 py-3 text-left">Vulnerability</th>
+            <th class="px-4 py-3 text-left">Owner</th>
+            <th class="px-4 py-3 text-center">Inherent</th>
+            <th class="px-4 py-3 text-center">Residual</th>
+            <th class="px-4 py-3 text-left">Treatment</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="risk-tbody" class="divide-y divide-gray-100"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="empty-risk-message" class="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-5 py-4 text-sm mt-4">
+    Select an asset from the catalog or click a dashboard metric to view risks.
+  </div>
+
+</div>
+
+<div id="asset-modal" class="fixed inset-0 hidden items-center justify-center modal-bg z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="goBackFromAssetModal()" class="modal-back-btn">← Back</button>
+        <h3 id="asset-modal-title" class="text-base font-bold text-gray-800">Register New Asset</h3>
+      </div>
+      <button type="button" onclick="closeAssetModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <form id="asset-form" onsubmit="saveAsset(event)" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <input id="a-name" required class="border rounded px-3 py-2 md:col-span-2" placeholder="Asset Name *">
+      <input id="a-process" required class="border rounded px-3 py-2" placeholder="Business Process *">
+      <input id="a-department" required class="border rounded px-3 py-2" placeholder="Department *">
+      <input id="a-bus-owner" required class="border rounded px-3 py-2" placeholder="Business Owner *">
+      <input id="a-it-owner" required class="border rounded px-3 py-2" placeholder="IT Owner *">
+      <input id="a-applicant-name" required class="border rounded px-3 py-2" placeholder="Applicant Name *">
+      <select id="a-data-class" class="border rounded px-3 py-2">
+        <option>Public</option><option>Internal</option><option selected>Confidential</option><option>Personal Data</option><option>Payment Data</option>
+      </select>
+      <select id="a-status" class="border rounded px-3 py-2">
+        <option>Draft</option><option selected>Submitted</option><option>Reviewed by InfoSec</option><option>Approved</option><option>Needs Update</option>
+      </select>
+      <div class="grid grid-cols-3 gap-3 md:col-span-2">
+        <div><label class="text-xs text-gray-500 block mb-1">Confidentiality</label>
+          <select id="a-c" class="w-full border rounded px-2 py-2"><option value="1">1 – Low</option><option value="2">2 – Med</option><option value="3" selected>3 – High</option></select></div>
+        <div><label class="text-xs text-gray-500 block mb-1">Integrity</label>
+          <select id="a-i" class="w-full border rounded px-2 py-2"><option value="1">1 – Low</option><option value="2">2 – Med</option><option value="3" selected>3 – High</option></select></div>
+        <div><label class="text-xs text-gray-500 block mb-1">Availability</label>
+          <select id="a-a" class="w-full border rounded px-2 py-2"><option value="1">1 – Low</option><option value="2">2 – Med</option><option value="3" selected>3 – High</option></select></div>
+      </div>
+      <div id="cia-preview" class="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-50 rounded px-3 py-2 md:col-span-2"></div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:col-span-2 border rounded p-4 bg-gray-50">
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="a-pci"> PCI DSS in scope</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="a-critical"> Critical process</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="a-internet"> Internet-facing</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="a-thirdparty"> Third-party dependency</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="a-cloud"> Cloud-hosted</label>
+      </div>
+      <input id="a-review-date" type="date" class="border rounded px-3 py-2 md:col-span-2" title="Next Review Date">
+      <div class="flex items-center gap-2 md:col-span-2">
+        <input id="a-evidence-name" class="border rounded px-3 py-2 flex-1" placeholder="Evidence filename (e.g. arch.pdf)">
+        <button type="button" onclick="addAssetEvidenceItem()" class="border rounded px-3 py-2 text-sm hover:bg-gray-50">Add</button>
+      </div>
+      <div id="a-evidence-list" class="md:col-span-2 flex flex-wrap gap-1 min-h-[1.5rem]"></div>
+      <textarea id="a-notes" class="border rounded px-3 py-2 md:col-span-2" rows="2" placeholder="Notes / description"></textarea>
+      <input id="a-edit-id" type="hidden" value="">
+      <div class="md:col-span-2 flex justify-between items-center pt-4">
+        <button type="button" id="a-delete-btn" onclick="confirmDeleteAsset()" class="hidden text-red-600 text-sm hover:underline">Delete asset</button>
+        <div class="flex gap-3 ml-auto">
+          <button type="button" onclick="closeAssetModal()" class="px-4 py-2 border rounded text-sm">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold">Save Asset</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="risk-modal" class="fixed inset-0 hidden items-center justify-center modal-bg z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="goBackFromRiskModal()" class="modal-back-btn">← Back</button>
+        <div>
+          <h3 id="risk-modal-title" class="text-base font-bold text-gray-800">Log New Risk</h3>
+          <p class="text-xs text-gray-500">Threat · Scoring · Controls · Treatment plan · Evidence · Comments</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRiskModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+
+    <div class="flex border-b px-6 bg-gray-50">
+      <button type="button" onclick="switchTab('risk-tab-basic')" id="tab-btn-basic" class="tab-btn active">Basic Info</button>
+      <button type="button" onclick="switchTab('risk-tab-controls')" id="tab-btn-controls" class="tab-btn">Controls</button>
+      <button type="button" onclick="switchTab('risk-tab-treatment')" id="tab-btn-treatment" class="tab-btn">Treatment</button>
+      <button type="button" onclick="switchTab('risk-tab-comments')" id="tab-btn-comments" class="tab-btn">Comments</button>
+    </div>
+
+    <form id="risk-form" onsubmit="saveRisk(event)" class="p-6">
+      
+      <div id="risk-tab-basic" class="tab-content space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Threat Type *</label>
+          <select id="r-threat-select" onchange="toggleOtherThreat()" required class="w-full border rounded px-3 py-2 text-sm">
+            <option value="">Select from catalogue…</option>
+            <option>Malware infection</option><option>Information disclosure</option><option>Digital identity and/or certificate theft</option><option>Eavesdropping</option><option>Power outage</option><option>Social engineering</option><option>Hardware replacement</option><option>DDoS</option><option>Internal Data Exfiltration</option><option>Violation of laws and/or regulations</option>
+            <option value="__OTHER__">— Other / New threat —</option>
+          </select>
+          <div id="r-other-wrapper" class="hidden mt-2">
+            <input id="r-threat-other" class="w-full border rounded px-3 py-2 text-sm" placeholder="Enter new threat type">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Vulnerability *</label>
+          <input id="r-vuln" required class="w-full border rounded px-3 py-2 text-sm" placeholder="Describe the vulnerability">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Risk Owner *</label>
+            <input id="r-owner" required class="w-full border rounded px-3 py-2 text-sm" placeholder="Risk owner">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Treatment Decision</label>
+            <select id="r-assessment" onchange="toggleAcceptanceDate()" class="w-full border rounded px-3 py-2 text-sm">
+              <option>Mitigate</option><option>Accept</option><option>Transfer</option><option>Avoid</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border rounded p-4 bg-orange-50">
+            <h4 class="font-semibold text-sm mb-3 text-orange-800">Inherent Risk (before controls)</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-600 block mb-1">Impact (1–5)</label>
+                <select id="r-impact" onchange="updateRiskPreview()" class="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="1">1 – Negligible</option><option value="2">2 – Minor</option><option value="3">3 – Moderate</option><option value="4">4 – Major</option><option value="5" selected>5 – Critical</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-600 block mb-1">Likelihood (1–5)</label>
+                <select id="r-likelihood" onchange="updateRiskPreview()" class="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="1">1 – Rare</option><option value="2">2 – Unlikely</option><option value="3" selected>3 – Possible</option><option value="4">4 – Likely</option><option value="5">5 – Almost certain</option>
+                </select>
+              </div>
+            </div>
+            <div id="inherent-preview" class="mt-3 text-center font-bold text-sm py-2 rounded"></div>
+          </div>
+          <div class="border rounded p-4 bg-green-50">
+            <h4 class="font-semibold text-sm mb-3 text-green-800">Residual Risk (after controls)</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-600 block mb-1">Impact (1–5)</label>
+                <select id="r-res-impact" onchange="updateRiskPreview()" class="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="1">1 – Negligible</option><option value="2">2 – Minor</option><option value="3" selected>3 – Moderate</option><option value="4">4 – Major</option><option value="5">5 – Critical</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-600 block mb-1">Likelihood (1–5)</label>
+                <select id="r-res-likelihood" onchange="updateRiskPreview()" class="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="1">1 – Rare</option><option value="2" selected>2 – Unlikely</option><option value="3">3 – Possible</option><option value="4">4 – Likely</option><option value="5">5 – Almost certain</option>
+                </select>
+              </div>
+            </div>
+            <div id="residual-preview" class="mt-3 text-center font-bold text-sm py-2 rounded"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="risk-tab-controls" class="tab-content hidden space-y-4">
+        <p class="text-xs text-gray-500">Check all controls currently in place for this risk.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 border rounded p-4 bg-gray-50">
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Backup exists" class="r-control"> Backup exists</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="DR plan exists" class="r-control"> DR plan exists</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="MFA enabled" class="r-control"> MFA enabled</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Antivirus/EDR installed" class="r-control"> Antivirus/EDR installed</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Network segmentation" class="r-control"> Network segmentation</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Access review performed" class="r-control"> Access review performed</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Physical access control" class="r-control"> Physical access control</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Monitoring/SIEM rule exists" class="r-control"> Monitoring/SIEM rule exists</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Vendor SLA exists" class="r-control"> Vendor SLA exists</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Patch management process" class="r-control"> Patch management process</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Encryption enabled" class="r-control"> Encryption enabled</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="DLP monitoring" class="r-control"> DLP monitoring</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="WAF protection" class="r-control"> WAF protection</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Incident response playbook" class="r-control"> Incident response playbook</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Vulnerability scanning" class="r-control"> Vulnerability scanning</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Security awareness training" class="r-control"> Security awareness training</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Data classification applied" class="r-control"> Data classification applied</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" value="Privileged access management" class="r-control"> Privileged access management</label>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Additional / custom control</label>
+          <input id="r-custom-control" class="w-full border rounded px-3 py-2 text-sm" placeholder="Describe any other control in place">
+        </div>
+      </div>
+
+      <div id="risk-tab-treatment" class="tab-content hidden space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Treatment Action Plan</label>
+          <textarea id="r-action-plan" class="w-full border rounded px-3 py-2 text-sm" rows="4" placeholder="Describe steps to treat / mitigate this risk…"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Responsible Person</label>
+            <input id="r-responsible" class="w-full border rounded px-3 py-2 text-sm" placeholder="Name / team">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Deadline</label>
+            <input id="r-deadline" type="date" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Treatment Status</label>
+            <select id="r-treatment-status" class="w-full border rounded px-3 py-2 text-sm">
+              <option>Open</option><option>In Progress</option><option>Completed</option>
+            </select>
+          </div>
+        </div>
+        <div id="acceptance-expiry-wrapper" class="hidden">
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Risk Acceptance Expiry Date</label>
+          <input id="r-acceptance-expiry" type="date" class="border rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Evidence Files</label>
+          <div class="flex gap-2">
+            <input id="r-evidence-name" class="flex-1 border rounded px-3 py-2 text-sm" placeholder="Evidence filename">
+            <button type="button" onclick="addRiskEvidenceItem()" class="border rounded px-3 py-2 text-sm hover:bg-gray-50">Add</button>
+          </div>
+          <div id="r-evidence-list" class="mt-2 flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+
+      <div id="risk-tab-comments" class="tab-content hidden space-y-4">
+        <div id="r-comments-list" class="space-y-2 min-h-[3rem]"></div>
+        <div class="flex gap-2">
+          <input id="r-new-comment" class="flex-1 border rounded px-3 py-2 text-sm" placeholder="Add InfoSec comment / review note…">
+          <button type="button" onclick="addCommentInModal()" class="border rounded px-3 py-2 text-sm hover:bg-gray-50 font-semibold">Add</button>
+        </div>
+      </div>
+
+      <input id="r-edit-id" type="hidden" value="">
+      <div class="flex justify-between items-center mt-6 pt-4 border-t">
+        <button type="button" id="r-delete-btn" onclick="confirmDeleteRisk()" class="hidden text-red-600 text-sm hover:underline">Delete risk</button>
+        <div class="flex gap-3 ml-auto">
+          <button type="button" onclick="closeRiskModal()" class="px-4 py-2 border rounded text-sm">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded text-sm font-semibold">Save Risk</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="asset-summary-modal" class="fixed inset-0 hidden items-center justify-center modal-bg z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="goBackFromSummaryModal()" class="modal-back-btn">← Back</button>
+        <div>
+          <h3 id="asset-summary-title" class="text-base font-bold text-gray-800">Asset Summary</h3>
+          <p class="text-xs text-gray-500">Complete asset profile · connected risks · treatment status · evidence</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAssetSummaryModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div id="asset-summary-content" class="p-6 space-y-5"></div>
+  </div>
+</div>
+
+<div id="heatmap-modal" class="fixed inset-0 hidden items-center justify-center modal-bg z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="closeHeatmapModal()" class="modal-back-btn">← Back</button>
+        <h3 class="text-base font-bold text-gray-800">Risk Heat Map — Residual Risks</h3>
+      </div>
+      <button type="button" onclick="closeHeatmapModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div class="p-6">
+      <div id="heatmap-content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-modal" class="fixed inset-0 hidden items-center justify-center modal-bg z-[60] p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+    <h3 class="font-bold text-gray-800" id="confirm-title">Are you sure?</h3>
+    <p class="text-sm text-gray-600" id="confirm-msg"></p>
+    <div class="flex gap-3 justify-end">
+      <button type="button" onclick="closeConfirm()" class="px-4 py-2 border rounded text-sm">Cancel</button>
+      <button type="button" id="confirm-ok" class="px-4 py-2 bg-red-600 text-white rounded text-sm font-semibold">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-[70] hidden">
+  <div id="toast-inner" class="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg"></div>
+</div>
+
+<script>
+// ═══════ 10 RANDOM ASSETS & RISKS DATA ═══════
+let assets = [
+  { id:'AST-001', name:'Core Banking Database', process:'Account Management', department:'Retail Banking', busOwner:'Retail Head', itOwner:'IT Division', applicantName:'Nino', c:3,i:3,a:3, dataClass:'Payment Data', pci:'Yes', criticalProcess:'Yes', internet:'No', thirdParty:'No', cloud:'No', status:'Approved', reviewDate:'2026-12-31', evidence:[], notes:'', submittedAt:'2026-06-01' },
+  { id:'AST-002', name:'SWIFT Messaging Gateway', process:'International Transfers', department:'Treasury', busOwner:'Treasury Head', itOwner:'IT Division', applicantName:'Giorgi', c:3,i:3,a:3, dataClass:'Confidential', pci:'No', criticalProcess:'Yes', internet:'No', thirdParty:'Yes', cloud:'No', status:'Reviewed by InfoSec', reviewDate:'2026-11-30', evidence:[], notes:'', submittedAt:'2026-06-03' },
+  { id:'AST-003', name:'Branch Guest WiFi', process:'Customer Access', department:'Marketing', busOwner:'Marketing Head', itOwner:'Network Admin', applicantName:'Mariam', c:1,i:1,a:2, dataClass:'Public', pci:'No', criticalProcess:'No', internet:'Yes', thirdParty:'No', cloud:'No', status:'Approved', reviewDate:'2026-10-15', evidence:[], notes:'', submittedAt:'2026-06-05' },
+  { id:'AST-004', name:'Mobile Banking App API', process:'Digital Banking', department:'Digital Channels', busOwner:'Digital Head', itOwner:'App Dev Team', applicantName:'Lasha', c:3,i:3,a:3, dataClass:'Payment Data', pci:'Yes', criticalProcess:'Yes', internet:'Yes', thirdParty:'No', cloud:'Yes', status:'Submitted', reviewDate:'2026-09-01', evidence:[], notes:'', submittedAt:'2026-06-07' },
+  { id:'AST-005', name:'ATM Network Controller', process:'Cash Dispensing', department:'Self-Service', busOwner:'Self-Service Head', itOwner:'Network Admin', applicantName:'Tamar', c:3,i:3,a:3, dataClass:'Payment Data', pci:'Yes', criticalProcess:'Yes', internet:'No', thirdParty:'Yes', cloud:'No', status:'Approved', reviewDate:'2026-08-20', evidence:[], notes:'', submittedAt:'2026-06-08' },
+  { id:'AST-006', name:'Corporate VPN Gateway', process:'Remote Access', department:'IT Operations', busOwner:'IT Operations Head', itOwner:'Network Admin', applicantName:'Davit', c:2,i:2,a:3, dataClass:'Internal', pci:'No', criticalProcess:'Yes', internet:'Yes', thirdParty:'No', cloud:'No', status:'Needs Update', reviewDate:'2026-07-15', evidence:[], notes:'', submittedAt:'2026-06-10' },
+  { id:'AST-007', name:'Card Personalization System', process:'Card Issuing', department:'Card Center', busOwner:'Card Center Head', itOwner:'IT Division', applicantName:'Levan', c:3,i:3,a:3, dataClass:'Payment Data', pci:'Yes', criticalProcess:'Yes', internet:'No', thirdParty:'No', cloud:'No', status:'Reviewed by InfoSec', reviewDate:'2026-12-01', evidence:[], notes:'', submittedAt:'2026-06-11' },
+  { id:'AST-008', name:'Active Directory Servers', process:'Identity Management', department:'IT Operations', busOwner:'IT Operations Head', itOwner:'SysAdmin', applicantName:'Salome', c:3,i:3,a:3, dataClass:'Confidential', pci:'Yes', criticalProcess:'Yes', internet:'No', thirdParty:'No', cloud:'No', status:'Approved', reviewDate:'2026-11-15', evidence:[], notes:'', submittedAt:'2026-06-12' },
+  { id:'AST-009', name:'HR Information System', process:'Employee Management', department:'Human Resources', busOwner:'HR Director', itOwner:'IT Applications', applicantName:'Keti', c:3,i:2,a:2, dataClass:'Personal Data', pci:'No', criticalProcess:'No', internet:'No', thirdParty:'Yes', cloud:'Yes', status:'Submitted', reviewDate:'2027-01-10', evidence:[], notes:'', submittedAt:'2026-06-15' },
+  { id:'AST-010', name:'Treasury Trading Platform', process:'FX Trading', department:'Treasury', busOwner:'Treasury Head', itOwner:'IT Division', applicantName:'Irakli', c:3,i:3,a:3, dataClass:'Confidential', pci:'No', criticalProcess:'Yes', internet:'Yes', thirdParty:'Yes', cloud:'No', status:'Approved', reviewDate:'2026-10-01', evidence:[], notes:'', submittedAt:'2026-06-18' }
+];
+
+let risks = [
+  { id:'RSK-001', assetId:'AST-001', threat:'Malware infection', vuln:'Unpatched DB engine', owner:'IT Division', impact:5, likelihood:3, resImpact:3, resLikelihood:2, assessment:'Mitigate', customThreat:false, controls:['Antivirus','Backup'], actionPlan:'Patch DB engine.', responsible:'DB Team', deadline:'2026-08-15', treatmentStatus:'In Progress', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-02' },
+  { id:'RSK-002', assetId:'AST-001', threat:'Information disclosure', vuln:'Excessive admin privileges', owner:'IT Division', impact:5, likelihood:2, resImpact:4, resLikelihood:1, assessment:'Mitigate', customThreat:false, controls:['Access review'], actionPlan:'Quarterly reviews.', responsible:'IAM Team', deadline:'2026-07-01', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-02' },
+  { id:'RSK-003', assetId:'AST-002', threat:'Digital identity and/or certificate theft', vuln:'Weak MFA implementation', owner:'Treasury Head', impact:5, likelihood:2, resImpact:3, resLikelihood:2, assessment:'Mitigate', customThreat:false, controls:['Physical access'], actionPlan:'Enforce Hardware Tokens.', responsible:'IT Security', deadline:'2026-09-10', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-04' },
+  { id:'RSK-004', assetId:'AST-003', threat:'Eavesdropping', vuln:'Open guest access', owner:'Network Admin', impact:2, likelihood:4, resImpact:2, resLikelihood:2, assessment:'Accept', customThreat:false, controls:['Network segmentation'], actionPlan:'Maintain network isolation.', responsible:'Network Admin', deadline:'2026-06-10', treatmentStatus:'Completed', acceptanceExpiry:'2026-12-31', evidence:[], comments:[], submittedAt:'2026-06-06' },
+  { id:'RSK-005', assetId:'AST-004', threat:'DDoS', vuln:'Lack of WAF on API', owner:'Digital Head', impact:4, likelihood:4, resImpact:3, resLikelihood:2, assessment:'Mitigate', customThreat:false, controls:['Playbook'], actionPlan:'Implement WAF.', responsible:'App Dev Team', deadline:'2026-08-01', treatmentStatus:'In Progress', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-08' },
+  { id:'RSK-006', assetId:'AST-004', threat:'Information disclosure', vuln:'Insecure API endpoint', owner:'App Dev Team', impact:5, likelihood:3, resImpact:4, resLikelihood:1, assessment:'Mitigate', customThreat:false, controls:[], actionPlan:'Remediate findings.', responsible:'App Dev Team', deadline:'2026-07-15', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-09' },
+  { id:'RSK-007', assetId:'AST-005', threat:'Hardware replacement', vuln:'Physical skimmers on ATM', owner:'Self-Service Head', impact:4, likelihood:3, resImpact:3, resLikelihood:2, assessment:'Mitigate', customThreat:false, controls:['Physical access'], actionPlan:'Deploy anti-skimming.', responsible:'Self-Service', deadline:'2026-11-01', treatmentStatus:'In Progress', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-10' },
+  { id:'RSK-008', assetId:'AST-006', threat:'Social engineering', vuln:'Phishing targeting VPN users', owner:'IT Operations Head', impact:5, likelihood:4, resImpact:4, resLikelihood:2, assessment:'Mitigate', customThreat:false, controls:['Training','MFA'], actionPlan:'Mandatory phishing simulation.', responsible:'InfoSec', deadline:'2026-08-30', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-12' },
+  { id:'RSK-009', assetId:'AST-007', threat:'Internal Data Exfiltration', vuln:'USB ports enabled on PC', owner:'Card Center Head', impact:5, likelihood:2, resImpact:5, resLikelihood:1, assessment:'Mitigate', customThreat:true, controls:['DLP monitoring'], actionPlan:'Block USB via GPO.', responsible:'IT Operations', deadline:'2026-06-25', treatmentStatus:'Completed', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-13' },
+  { id:'RSK-010', assetId:'AST-008', threat:'Malware infection', vuln:'Ransomware lateral movement', owner:'IT Operations Head', impact:5, likelihood:3, resImpact:5, resLikelihood:1, assessment:'Mitigate', customThreat:false, controls:['Antivirus','Network seg'], actionPlan:'Tiered AD Administration.', responsible:'SysAdmin', deadline:'2026-12-01', treatmentStatus:'In Progress', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-15' },
+  { id:'RSK-011', assetId:'AST-009', threat:'Violation of laws and/or regulations', vuln:'Third-party data breach', owner:'HR Director', impact:4, likelihood:3, resImpact:3, resLikelihood:2, assessment:'Transfer', customThreat:false, controls:['Vendor SLA'], actionPlan:'Review cyber insurance.', responsible:'Legal', deadline:'2026-09-01', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-16' },
+  { id:'RSK-012', assetId:'AST-010', threat:'Power outage', vuln:'Single UPS failure', owner:'Treasury Head', impact:4, likelihood:2, resImpact:2, resLikelihood:1, assessment:'Mitigate', customThreat:false, controls:['Backup'], actionPlan:'Install redundant UPS.', responsible:'Facilities', deadline:'2026-05-20', treatmentStatus:'Open', acceptanceExpiry:'', evidence:[], comments:[], submittedAt:'2026-06-19' } // Made this one overdue for demo
+];
+
+// ═══════ STATE ═══════
+let selectedAssetId = null;
+let globalFilter = { type: null, value: null, label: null }; 
+const today = new Date().toISOString().split('T')[0];
+let chartInstances = {};
+
+// ═══════ UTILS ═══════
+function genId(prefix, arr) { return `${prefix}-${String(arr.length+1).padStart(3,'0')}`; }
+function assetValue(a) { return a.c * a.i * a.a; }
+function criticality(v) { return v<=6?['Low','bg-green-100 text-green-800'] : v<=19?['Medium','bg-yellow-100 text-yellow-800'] : ['High','bg-red-100 text-red-800']; }
+function riskLevel(s) { return s<=4?['Low','bg-green-100 text-green-800'] : s<=9?['Medium','bg-yellow-100 text-yellow-800'] : s<=14?['High','bg-orange-100 text-orange-800'] : ['Critical','bg-red-100 text-red-800']; }
+function isOverdue(r) { return r.deadline && r.treatmentStatus !== 'Completed' && r.deadline < today; }
+function getField(id) { return document.getElementById(id)?.value?.trim() ?? ''; }
+function setField(id, val) { const el=document.getElementById(id); if(el) el.value = val ?? ''; }
+function setCheck(id, val) { const el=document.getElementById(id); if(el) el.checked = val; }
+
+function toast(msg, color='bg-gray-900') {
+  const t=document.getElementById('toast'), ti=document.getElementById('toast-inner');
+  ti.className=`${color} text-white text-sm px-4 py-2.5 rounded-lg shadow-lg`;
+  ti.textContent=msg; t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'),2500);
+}
+
+function downloadCsv(filename, rows) {
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 0);
+}
+
+function exportAssetsCsv() {
+  const rows = [[
+    'Asset ID','Name','Process','Department','Business Owner','IT Owner','Applicant','C','I','A','Value','Criticality','Data Class','PCI','Critical Process','Internet Facing','Third Party','Cloud','Status','Review Date','Submitted At','Notes'
+  ]];
+  assets.forEach(a => {
+    const v = assetValue(a);
+    rows.push([a.id,a.name,a.process,a.department,a.busOwner,a.itOwner,a.applicantName,a.c,a.i,a.a,v,criticality(v)[0],a.dataClass,a.pci,a.criticalProcess,a.internet,a.thirdParty,a.cloud,a.status,a.reviewDate,a.submittedAt,a.notes]);
+  });
+  downloadCsv(`rcsa-assets-${today}.csv`, rows);
+}
+
+function exportRisksCsv() {
+  const rows = [[
+    'Risk ID','Asset ID','Asset Name','Threat','Vulnerability','Owner','Inherent Score','Inherent Level','Residual Score','Residual Level','Decision','Treatment Status','Responsible','Deadline','Overdue','Controls','Action Plan','Acceptance Expiry','Submitted At'
+  ]];
+  risks.forEach(r => {
+    const a = assets.find(x => x.id === r.assetId);
+    const inherent = r.impact * r.likelihood;
+    const residual = r.resImpact * r.resLikelihood;
+    rows.push([r.id,r.assetId,a?.name||'',r.threat,r.vuln,r.owner,inherent,riskLevel(inherent)[0],residual,riskLevel(residual)[0],r.assessment,isOverdue(r)?'Overdue':r.treatmentStatus,r.responsible,r.deadline,isOverdue(r)?'Yes':'No',(r.controls||[]).join('; '),r.actionPlan,r.acceptanceExpiry,r.submittedAt]);
+  });
+  downloadCsv(`rcsa-risks-${today}.csv`, rows);
+}
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function debounce(fn, delay=120) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+}
+const debouncedRenderAssets = debounce(renderAssets, 120);
+
+// ═══════ GLOBAL FILTERING ═══════
+function setGlobalFilter(type, value, label) {
+  globalFilter = { type, value, label };
+  selectedAssetId = null; // Unselect single asset
+  document.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('active-row'));
+  document.getElementById('asset-detail').classList.add('hidden');
+  
+  // Show banner
+  document.getElementById('global-filter-banner').style.display = 'flex';
+  document.getElementById('global-filter-banner-text').textContent = label;
+  
+  // If asset filter, scroll to assets. If risk filter, scroll to risks.
+  if(['assetCriticality'].includes(type)) {
+    renderAssets();
+    document.getElementById('asset-section').scrollIntoView({behavior:'smooth'});
+    document.getElementById('risk-section').classList.add('hidden');
+    document.getElementById('empty-risk-message').style.display = 'block';
+  } else {
+    document.getElementById('selected-asset-name').textContent = `Global Filter: ${label}`;
+    document.getElementById('risk-section').classList.remove('hidden');
+    document.getElementById('empty-risk-message').style.display = 'none';
+    renderRisks();
+    document.getElementById('risk-section').scrollIntoView({behavior:'smooth'});
+  }
+}
+
+function clearGlobalFilter() {
+  globalFilter = { type: null, value: null, label: null };
+  selectedAssetId = null;
+  document.getElementById('global-filter-banner').style.display = 'none';
+  document.getElementById('risk-section').classList.add('hidden');
+  document.getElementById('empty-risk-message').style.display = 'block';
+  clearAssetFilters(); // This will renderAssets
+}
+
+function dashFilter(tip) {
+  if(tip==='all') clearGlobalFilter();
+  else if(tip==='high-assets') setGlobalFilter('assetCriticality', 'High', 'High-Value Assets');
+  else if(tip==='all-risks') setGlobalFilter('allRisks', 'all', 'All Global Risks');
+  else if(tip==='high-risks') setGlobalFilter('riskLevel', 'HighOrCritical', 'High / Critical Risks');
+  else if(tip==='accepted') setGlobalFilter('riskAssessment', 'Accept', 'Accepted Risks');
+  else if(tip==='overdue') setGlobalFilter('riskOverdue', true, 'Overdue Plans');
+  else if(tip==='completed') setGlobalFilter('riskStatus', 'Completed', 'Completed Plans');
+}
+
+// ═══════ CHART DRAWING (8 CHARTS) ═══════
+function renderDashboard() {
+  const highAssets = assets.filter(a => criticality(assetValue(a))[0]==='High').length;
+  const highRisks = risks.filter(r => ['High','Critical'].includes(riskLevel(r.resImpact*r.resLikelihood)[0])).length;
+  const accepted = risks.filter(r => r.assessment==='Accept').length;
+  const overdue = risks.filter(isOverdue).length;
+  const completed = risks.filter(r=>r.treatmentStatus==='Completed').length;
+  
+  const cards = [
+    {label:'Total Assets', val:assets.length, cls:'text-blue-700', tip:'all'},
+    {label:'High-Value Assets', val:highAssets, cls:'text-red-600', tip:'high-assets'},
+    {label:'Total Risks', val:risks.length, cls:'text-gray-700', tip:'all-risks'},
+    {label:'High / Critical', val:highRisks, cls:'text-red-600', tip:'high-risks'},
+    {label:'Accepted Risks', val:accepted, cls:'text-orange-600', tip:'accepted'},
+    {label:'Overdue Plans', val:overdue, cls:overdue>0?'text-red-700':'text-gray-700', tip:'overdue'},
+    {label:'Completed Plans', val:completed, cls:'text-green-700', tip:'completed'},
+  ];
+  document.getElementById('dashboard-cards').innerHTML = cards.map(c =>
+    `<div class="bg-white rounded-lg shadow p-3 cursor-pointer hover:shadow-md transition" onclick="dashFilter('${c.tip}')">
+      <div class="text-xs text-gray-500 leading-tight">${c.label}</div>
+      <div class="text-2xl font-bold ${c.cls} mt-0.5">${c.val}</div>
+    </div>`
+  ).join('');
+
+  drawCharts();
+}
+
+function drawCharts() {
+  Object.values(chartInstances).forEach(c => c.destroy());
+  chartInstances = {};
+
+  Chart.defaults.font.family = 'sans-serif';
+  Chart.defaults.color = '#64748b';
+  const defaultOpts = (title, type, filterFn) => ({
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: {display: false}, title: {display: true, text: title, color:'#0F172A', font:{size:14}} },
+    onClick: (e, els) => { if(els.length) filterFn(els[0].index); }
+  });
+
+  // 1. Asset Criticality
+  const critCounts = { 'Low':0, 'Medium':0, 'High':0 };
+  assets.forEach(a => critCounts[criticality(assetValue(a))[0]]++);
+  chartInstances.crit = new Chart(document.getElementById('chartAssetCrit').getContext('2d'), {
+    type: 'bar',
+    data: { labels: Object.keys(critCounts), datasets: [{ data: Object.values(critCounts), backgroundColor: ['#22c55e', '#eab308', '#ef4444'], borderRadius: 4 }] },
+    options: defaultOpts('Asset Criticality Pipeline', 'bar', (i) => setGlobalFilter('assetCriticality', Object.keys(critCounts)[i], `Assets: ${Object.keys(critCounts)[i]} Criticality`))
+  });
+
+  // 2. Risk Treatment Status
+  const treatCounts = { 'Open':0, 'In Progress':0, 'Completed':0, 'Overdue':0 };
+  risks.forEach(r => { if(isOverdue(r)) treatCounts['Overdue']++; else treatCounts[r.treatmentStatus] = (treatCounts[r.treatmentStatus]||0) + 1; });
+  chartInstances.treat = new Chart(document.getElementById('chartTreatment').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(treatCounts), datasets: [{ data: Object.values(treatCounts), backgroundColor: ['#94a3b8', '#3b82f6', '#22c55e', '#ef4444'] }] },
+    options: { ...defaultOpts('Treatment Status', 'doughnut', (i) => {
+      const lbl = Object.keys(treatCounts)[i];
+      if(lbl === 'Overdue') setGlobalFilter('riskOverdue', true, 'Overdue Risk Plans');
+      else setGlobalFilter('riskStatus', lbl, `Risks: ${lbl} Status`);
+    }), plugins: { legend: {display:true, position:'bottom', labels:{boxWidth:12}}, title:{display:true, text:'Risk Treatment Status', color:'#0F172A'} } }
+  });
+
+  // 3. Residual Risk Heat Map
+  const heatData = [];
+  for(let x=1;x<=5;x++){ for(let y=1;y<=5;y++){
+    const count = risks.filter(r => r.resImpact===x && r.resLikelihood===y).length;
+    if(count > 0) {
+      const score = x*y;
+      const bg = score<=4?'#22c55e':score<=9?'#eab308':score<=14?'#f97316':'#ef4444';
+      heatData.push({x:x, y:y, r:count*6+4, count:count, bg:bg});
+    }
+  }}
+  chartInstances.heat = new Chart(document.getElementById('chartHeatmap').getContext('2d'), {
+    type: 'bubble',
+    data: { datasets: [{ data: heatData, backgroundColor: heatData.map(d=>d.bg) }] },
+    options: {
+      ...defaultOpts('Residual Risk Heat Map', 'bubble', (i) => setGlobalFilter('riskHeat', {i:heatData[i].x, l:heatData[i].y}, `Risks: Impact ${heatData[i].x}, Likelihood ${heatData[i].y}`)),
+      scales: {
+        x: { title:{display:true,text:'Impact'}, min:0.5, max:5.5, ticks:{stepSize:1} },
+        y: { title:{display:true,text:'Likelihood'}, min:0.5, max:5.5, ticks:{stepSize:1} }
+      },
+      plugins: { tooltip: { callbacks: { label: (ctx)=>`I:${ctx.raw.x} L:${ctx.raw.y} - Count: ${ctx.raw.count}` } }, legend: {display:false}, title:{display:true, text:'Residual Heat Map', color:'#0F172A'} }
+    }
+  });
+
+  // 4. Department Risk Dashboard
+  const deptCounts = {};
+  risks.forEach(r => {
+    const a = assets.find(x=>x.id===r.assetId);
+    if(a) { deptCounts[a.department] = (deptCounts[a.department]||0)+1; }
+  });
+  chartInstances.dept = new Chart(document.getElementById('chartDeptRisk').getContext('2d'), {
+    type: 'bar',
+    data: { labels: Object.keys(deptCounts), datasets: [{ data: Object.values(deptCounts), backgroundColor: '#00B8D9', borderRadius: 4 }] },
+    options: defaultOpts('Risks by Department', 'bar', (i) => setGlobalFilter('riskDept', Object.keys(deptCounts)[i], `Risks for Dept: ${Object.keys(deptCounts)[i]}`))
+  });
+
+  // 5. Top Threat Types
+  const threatCounts = {};
+  risks.forEach(r => threatCounts[r.threat] = (threatCounts[r.threat]||0)+1);
+  const sortedThreats = Object.entries(threatCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  chartInstances.threat = new Chart(document.getElementById('chartTopThreats').getContext('2d'), {
+    type: 'bar',
+    data: { labels: sortedThreats.map(t=>t[0].length>15?t[0].substring(0,15)+'...':t[0]), datasets: [{ data: sortedThreats.map(t=>t[1]), backgroundColor: '#8B5CF6', borderRadius: 4 }] },
+    options: { ...defaultOpts('Top 5 Threats', 'bar', (i) => setGlobalFilter('riskThreat', sortedThreats[i][0], `Risks: Threat - ${sortedThreats[i][0]}`)), indexAxis: 'y' }
+  });
+
+  // 6. Overdue Actions Dashboard
+  const overdueCounts = {};
+  risks.filter(isOverdue).forEach(r => { overdueCounts[r.responsible||'Unassigned'] = (overdueCounts[r.responsible||'Unassigned']||0)+1; });
+  chartInstances.overdue = new Chart(document.getElementById('chartOverdue').getContext('2d'), {
+    type: 'bar',
+    data: { labels: Object.keys(overdueCounts).length ? Object.keys(overdueCounts) : ['None'], datasets: [{ data: Object.keys(overdueCounts).length ? Object.values(overdueCounts) : [0], backgroundColor: '#DC2626', borderRadius: 4 }] },
+    options: defaultOpts('Overdue by Owner', 'bar', (i) => {
+      if(Object.keys(overdueCounts).length) setGlobalFilter('riskOverdueOwner', Object.keys(overdueCounts)[i], `Overdue Risks for ${Object.keys(overdueCounts)[i]}`);
+    })
+  });
+
+  // 7. Accepted Risk Dashboard
+  const accCounts = {};
+  risks.filter(r=>r.assessment==='Accept').forEach(r => {
+    const a = assets.find(x=>x.id===r.assetId);
+    if(a) { accCounts[a.department] = (accCounts[a.department]||0)+1; }
+  });
+  chartInstances.acc = new Chart(document.getElementById('chartAccepted').getContext('2d'), {
+    type: 'pie',
+    data: { labels: Object.keys(accCounts).length?Object.keys(accCounts):['None'], datasets: [{ data: Object.keys(accCounts).length?Object.values(accCounts):[1], backgroundColor: ['#f97316', '#fcd34d', '#fb923c', '#fdba74'] }] },
+    options: { ...defaultOpts('Accepted Risks by Dept', 'pie', (i) => {
+      if(Object.keys(accCounts).length) setGlobalFilter('riskAcceptedDept', Object.keys(accCounts)[i], `Accepted Risks for Dept: ${Object.keys(accCounts)[i]}`);
+    }), plugins:{ legend:{display:true, position:'right', labels:{boxWidth:10}}, title:{display:true, text:'Accepted Risks', color:'#0F172A'} } }
+  });
+
+  // 8. Control Gap Dashboard
+  const gapCounts = {'0 Controls':0, '1-2 Controls':0, '3+ Controls':0};
+  risks.forEach(r => {
+    const c = r.controls.length;
+    if(c===0) gapCounts['0 Controls']++;
+    else if(c<=2) gapCounts['1-2 Controls']++;
+    else gapCounts['3+ Controls']++;
+  });
+  chartInstances.gap = new Chart(document.getElementById('chartControlGap').getContext('2d'), {
+    type: 'bar',
+    data: { labels: Object.keys(gapCounts), datasets: [{ data: Object.values(gapCounts), backgroundColor: ['#ef4444', '#f97316', '#22c55e'], borderRadius: 4 }] },
+    options: defaultOpts('Control Coverage Gaps', 'bar', (i) => setGlobalFilter('riskControlCount', i, `Risks with ${Object.keys(gapCounts)[i]}`))
+  });
+}
+
+// ═══════ ASSET MODAL LOGIC ═══════
+let assetEvidenceArr = [];
+
+function openAssetModal(editId) {
+  assetEvidenceArr = [];
+  document.getElementById('asset-form').reset();
+  document.getElementById('a-evidence-list').innerHTML='';
+  document.getElementById('a-edit-id').value='';
+  document.getElementById('a-delete-btn').classList.add('hidden');
+  document.getElementById('asset-modal-title').textContent='Register New Asset';
+  
+  if(editId) {
+    const a=assets.find(x=>x.id===editId); if(!a) return;
+    document.getElementById('asset-modal-title').textContent=`Edit Asset — ${a.id}`;
+    document.getElementById('a-edit-id').value=a.id;
+    document.getElementById('a-delete-btn').classList.remove('hidden');
+    setField('a-name',a.name); setField('a-process',a.process); setField('a-department',a.department);
+    setField('a-bus-owner',a.busOwner); setField('a-it-owner',a.itOwner);
+    setField('a-applicant-name',a.applicantName);
+    setField('a-data-class',a.dataClass); setField('a-status',a.status);
+    setField('a-c',a.c); setField('a-i',a.i); setField('a-a',a.a);
+    setField('a-review-date',a.reviewDate||''); setField('a-notes',a.notes||'');
+    setCheck('a-pci',a.pci==='Yes'); setCheck('a-critical',a.criticalProcess==='Yes');
+    setCheck('a-internet',a.internet==='Yes'); setCheck('a-thirdparty',a.thirdParty==='Yes');
+    setCheck('a-cloud',a.cloud==='Yes');
+    assetEvidenceArr=[...( a.evidence||[])];
+    renderEvidenceTags('a-evidence-list',assetEvidenceArr, removeAssetEvidence);
+  }
+  updateCiaPreview();
+  document.getElementById('asset-modal').classList.remove('hidden');
+  document.getElementById('asset-modal').classList.add('flex');
+}
+
+function closeAssetModal(returnToSummary=true) {
+  document.getElementById('asset-modal').classList.add('hidden');
+  document.getElementById('asset-modal').classList.remove('flex');
+  if(returnToSummary && summaryReturnAssetId) {
+    const id = summaryReturnAssetId;
+    summaryReturnAssetId = null;
+    if(assets.some(a => a.id === id)) openAssetSummaryModal(id);
+  }
+}
+
+function addAssetEvidenceItem() {
+  const val=getField('a-evidence-name'); if(!val) return;
+  assetEvidenceArr.push(val); setField('a-evidence-name','');
+  renderEvidenceTags('a-evidence-list',assetEvidenceArr, removeAssetEvidence);
+}
+
+function removeAssetEvidence(i) { 
+  assetEvidenceArr.splice(i,1); 
+  renderEvidenceTags('a-evidence-list',assetEvidenceArr, removeAssetEvidence); 
+}
+
+function renderEvidenceTags(containerId, arr, removeFn) {
+  const el=document.getElementById(containerId); if(!el) return;
+  el.innerHTML=arr.map((e,i)=>`<span class="badge bg-gray-200 text-gray-700 flex items-center gap-1">${esc(e)} <button type="button" onclick="${removeFn.name}(${i})" class="text-gray-500 hover:text-red-600 font-bold leading-none">×</button></span>`).join('');
+}
+
+function updateCiaPreview() {
+  const c=Number(getField('a-c')||3), i=Number(getField('a-i')||3), a=Number(getField('a-a')||3), v=c*i*a;
+  const [cl,cc]=criticality(v);
+  const el=document.getElementById('cia-preview');
+  if(el) el.innerHTML=`Asset Value: <span class="font-bold text-lg ml-1">${v}</span> <span class="badge ${cc} ml-2">${cl}</span>`;
+}
+['a-c','a-i','a-a'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', updateCiaPreview); });
+
+function saveAsset(e) {
+  e.preventDefault();
+  const editId=getField('a-edit-id');
+  const obj = {
+    id: editId || genId('AST',assets),
+    name:getField('a-name'), process:getField('a-process'), department:getField('a-department'),
+    busOwner:getField('a-bus-owner'), itOwner:getField('a-it-owner'),
+    applicantName:getField('a-applicant-name'),
+    c:Number(getField('a-c')), i:Number(getField('a-i')), a:Number(getField('a-a')),
+    dataClass:getField('a-data-class'), status:getField('a-status'),
+    pci:document.getElementById('a-pci').checked?'Yes':'No',
+    criticalProcess:document.getElementById('a-critical').checked?'Yes':'No',
+    internet:document.getElementById('a-internet').checked?'Yes':'No',
+    thirdParty:document.getElementById('a-thirdparty').checked?'Yes':'No',
+    cloud:document.getElementById('a-cloud').checked?'Yes':'No',
+    reviewDate:getField('a-review-date'), notes:getField('a-notes'),
+    evidence:[...assetEvidenceArr],
+    submittedAt: editId ? (assets.find(x=>x.id===editId)?.submittedAt||today) : today
+  };
+  if(editId) { const idx=assets.findIndex(x=>x.id===editId); if(idx!==-1) assets[idx]=obj; toast('Asset updated','bg-green-700'); }
+  else { assets.push(obj); toast('Asset registered','bg-green-700'); }
+  const returnId = summaryReturnAssetId ? obj.id : null;
+  summaryReturnAssetId = null;
+  closeAssetModal(false); renderDashboard(); renderAssets();
+  if(returnId) { openAssetSummaryModal(returnId); return; }
+  if(selectedAssetId===editId||!editId) { selectAsset(obj.id); }
+}
+
+function confirmDeleteAsset(id) {
+  const target=id||getField('a-edit-id'); if(!target) return;
+  const a=assets.find(x=>x.id===target); if(!a) return;
+  showConfirm(`Delete "${a.name}"?`,`This will also delete all ${risks.filter(r=>r.assetId===target).length} risk(s) linked to this asset. This cannot be undone.`,()=>{
+    assets=assets.filter(x=>x.id!==target);
+    risks=risks.filter(r=>r.assetId!==target);
+    if(selectedAssetId===target) {
+      selectedAssetId=null;
+      document.getElementById('risk-section').classList.add('hidden');
+      document.getElementById('empty-risk-message').style.display='';
+      document.getElementById('asset-detail').classList.add('hidden');
+    }
+    summaryReturnAssetId = null;
+    closeAssetModal(false); renderDashboard(); renderAssets();
+    toast('Asset deleted','bg-red-700');
+  });
+}
+
+// ═══════ ASSET FILTER & RENDER ═══════
+function getFilteredAssets() {
+  if (globalFilter.type === 'assetCriticality') {
+    return assets.filter(a => criticality(assetValue(a))[0] === globalFilter.value);
+  }
+
+  const q=(getField('asset-search')).toLowerCase();
+  const f=document.getElementById('asset-value-filter').value;
+  let minV=getField('asset-min-value') ? Number(getField('asset-min-value')) : null;
+  let maxV=getField('asset-max-value') ? Number(getField('asset-max-value')) : null;
+  if(f==='low'){minV=1;maxV=6} if(f==='medium'){minV=7;maxV=19} if(f==='high'){minV=20;maxV=27}
+  const critF=document.getElementById('asset-criticality-filter').value;
+  const pciF=document.getElementById('asset-pci-filter').value;
+  
+  return assets.filter(a=>{
+    const v=assetValue(a), crit=criticality(v)[0];
+    const text=`${a.id} ${a.name} ${a.process} ${a.department} ${a.busOwner} ${a.itOwner}`.toLowerCase();
+    if(q && !text.includes(q)) return false;
+    if(minV!==null && v<minV) return false;
+    if(maxV!==null && v>maxV) return false;
+    if(critF && crit!==critF) return false;
+    if(pciF && a.pci!==pciF) return false;
+    return true;
+  });
+}
+
+function applyAssetPresetFilter() {
+  const f=document.getElementById('asset-value-filter').value;
+  const min=document.getElementById('asset-min-value'), max=document.getElementById('asset-max-value');
+  if(f==='low'){min.value=1;max.value=6} else if(f==='medium'){min.value=7;max.value=19} else if(f==='high'){min.value=20;max.value=27} else if(f==='all'){min.value='';max.value=''}
+  renderAssets();
+}
+
+function clearAssetFilters() {
+  ['asset-search','asset-min-value','asset-max-value','asset-criticality-filter','asset-pci-filter'].forEach(id=>setField(id,''));
+  document.getElementById('asset-value-filter').value='all'; renderAssets();
+}
+
+function renderAssets() {
+  const tbody=document.getElementById('asset-tbody'); tbody.innerHTML='';
+  const filtered=getFilteredAssets();
+  
+  if(!filtered.length) { tbody.innerHTML='<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">No assets match current filters.</td></tr>'; return; }
+  
+  filtered.forEach(a => {
+    const v=assetValue(a), [cl,cc]=criticality(v);
+    const rCount=risks.filter(r=>r.assetId===a.id).length;
+    const safe = Object.fromEntries(Object.entries(a).map(([k,v]) => [k, esc(v)]));
+    const tr=document.createElement('tr'); tr.id=`row-${safe.id}`; tr.className='asset-row';
+    tr.onclick=()=>openAssetSummaryModal(a.id);
+    tr.innerHTML=`
+      <td class="px-4 py-3 font-mono text-blue-600 font-semibold text-xs">${safe.id}</td>
+      <td class="px-4 py-3"><div class="font-semibold text-gray-800">${safe.name}</div><div class="text-xs text-gray-500">${safe.process} · ${safe.department}</div></td>
+      <td class="px-4 py-3 text-sm"><div>${safe.busOwner}</div><div class="text-xs text-gray-500">${safe.itOwner}</div></td>
+      <td class="px-4 py-3 text-center font-mono text-sm text-gray-700">${a.c}–${a.i}–${a.a}</td>
+      <td class="px-4 py-3 text-center"><span class="font-bold text-base">${v}</span><br><span class="badge ${cc} text-[.65rem]">${cl}</span></td>
+      <td class="px-4 py-3 text-xs flex flex-wrap gap-1 mt-1"><span class="badge bg-gray-100 text-gray-700">${safe.dataClass}</span><span class="badge bg-gray-100 text-gray-500">${rCount} risk${rCount!==1?'s':''}</span></td>
+      <td class="px-4 py-3"><span class="badge ${a.status==='Approved'?'bg-green-100 text-green-800':'bg-gray-100 text-gray-700'}">${safe.status}</span></td>
+      <td class="px-4 py-3 flex gap-2" onclick="event.stopPropagation()">
+        <button onclick="openAssetModal('${safe.id}')" class="text-blue-600 text-xs hover:underline">Edit</button>
+        <button onclick="confirmDeleteAsset('${safe.id}')" class="text-red-500 text-xs hover:underline">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  if(selectedAssetId) {
+    const row=document.getElementById(`row-${selectedAssetId}`);
+    if(row) row.classList.add('active-row');
+  }
+}
+
+function selectAsset(id) {
+  const a=assets.find(x=>x.id===id); if(!a) return;
+  globalFilter = { type: null, value: null, label: null }; // Clear global on specific selection
+  document.getElementById('global-filter-banner').style.display = 'none';
+  selectedAssetId=id;
+
+  document.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('active-row'));
+  const row=document.getElementById(`row-${id}`); if(row) row.classList.add('active-row');
+  document.getElementById('risk-section').classList.remove('hidden');
+  document.getElementById('empty-risk-message').style.display='none';
+  document.getElementById('selected-asset-name').textContent=`${a.id} – ${a.name}`;
+  
+  // Reset local risk dropdowns
+  document.getElementById('risk-level-filter').value=''; document.getElementById('risk-status-filter').value=''; document.getElementById('risk-assessment-filter').value='';
+  renderAssetDetail(a);
+  renderRisks();
+  document.getElementById('risk-section').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderAssetDetail(a) {
+  const v=assetValue(a), [cl,cc]=criticality(v);
+  const safe = Object.fromEntries(Object.entries(a).map(([k,v]) => [k, esc(v)]));
+  document.getElementById('asset-detail').classList.remove('hidden');
+  document.getElementById('asset-detail').innerHTML=`
+    <div class="flex flex-col lg:flex-row lg:justify-between gap-3">
+      <div><h3 class="font-bold text-gray-800">${safe.id} – ${safe.name}</h3><p class="text-xs text-gray-500 mt-0.5">${safe.process} · ${safe.department}</p></div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="openAssetModal('${safe.id}')" class="border rounded px-3 py-1.5 text-sm hover:bg-gray-50">Edit Asset</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+      <div><div class="text-xs text-gray-500 font-semibold uppercase">Applicant</div><div>${a.applicantName}</div></div>
+      <div><div class="text-xs text-gray-500 font-semibold uppercase">Data Class</div><div>${safe.dataClass}</div></div>
+      <div><div class="text-xs text-gray-500 font-semibold uppercase">Next Review</div><div>${a.reviewDate||'Not set'}</div></div>
+      <div><div class="text-xs text-gray-500 font-semibold uppercase">Asset Value</div><div class="font-bold text-lg">${v} <span class="badge ${cc} text-xs">${cl}</span></div></div>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-1">
+      ${a.pci==='Yes'?'<span class="badge bg-purple-100 text-purple-800">PCI DSS</span>':''}
+      ${a.criticalProcess==='Yes'?'<span class="badge bg-red-100 text-red-800">Critical Process</span>':''}
+      ${a.internet==='Yes'?'<span class="badge bg-blue-100 text-blue-800">Internet-facing</span>':''}
+      ${a.thirdParty==='Yes'?'<span class="badge bg-yellow-100 text-yellow-800">3rd Party Dep.</span>':''}
+      ${a.cloud==='Yes'?'<span class="badge bg-sky-100 text-sky-800">Cloud-hosted</span>':''}
+    </div>`;
+}
+
+
+// ═══════ ASSET SUMMARY MODAL ═══════
+let currentSummaryAssetId = null;
+let summaryReturnAssetId = null;
+
+function goBackFromAssetModal() {
+  closeAssetModal(true);
+}
+
+function goBackFromRiskModal() {
+  closeRiskModal(true);
+}
+
+function goBackFromSummaryModal() {
+  closeAssetSummaryModal();
+}
+
+function closeHeatmapModal() {
+  document.getElementById('heatmap-modal').classList.add('hidden');
+  document.getElementById('heatmap-modal').classList.remove('flex');
+}
+
+function hideAssetSummaryModal(preserveContext=false) {
+  if(!preserveContext) currentSummaryAssetId = null;
+  document.getElementById('asset-summary-modal').classList.add('hidden');
+  document.getElementById('asset-summary-modal').classList.remove('flex');
+}
+
+function closeAssetSummaryModal() {
+  summaryReturnAssetId = null;
+  hideAssetSummaryModal(false);
+}
+
+function viewAssetRiskTable(assetId) {
+  closeAssetSummaryModal();
+  selectAsset(assetId);
+}
+
+function openAssetEditFromSummary(assetId) {
+  summaryReturnAssetId = assetId;
+  hideAssetSummaryModal(true);
+  openAssetModal(assetId);
+}
+
+function openRiskModalForAsset(assetId) {
+  selectedAssetId = assetId;
+  summaryReturnAssetId = assetId;
+  hideAssetSummaryModal(true);
+  openRiskModal();
+}
+
+function openRiskEditFromSummary(riskId) {
+  const r = risks.find(x => x.id === riskId);
+  if(r) selectedAssetId = r.assetId;
+  summaryReturnAssetId = r ? r.assetId : currentSummaryAssetId;
+  hideAssetSummaryModal(true);
+  openRiskModal(riskId);
+}
+
+function renderRiskSummaryRow(r) {
+  const asset = assets.find(a => a.id === r.assetId);
+  const inScore = r.impact * r.likelihood;
+  const resScore = r.resImpact * r.resLikelihood;
+  const inLevel = riskLevel(inScore);
+  const resLevel = riskLevel(resScore);
+  const status = isOverdue(r) ? 'Overdue' : r.treatmentStatus;
+  const statusBadge = status === 'Overdue' ? 'bg-red-100 text-red-800' : status === 'Completed' ? 'bg-green-100 text-green-800' : status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700';
+  const controls = (r.controls && r.controls.length) ? r.controls.map(c => `<span class="badge bg-gray-100 text-gray-700">${esc(c)}</span>`).join('') : '<span class="text-xs text-red-500">No controls registered</span>';
+  const evidence = (r.evidence && r.evidence.length) ? r.evidence.map(e => `<span class="badge bg-blue-100 text-blue-800">${esc(e)}</span>`).join('') : '<span class="text-xs text-gray-400">No evidence</span>';
+  const comments = (r.comments && r.comments.length) ? r.comments.map(c => `<div class="comment-bubble">${esc(c)}</div>`).join('') : '<span class="text-xs text-gray-400">No comments</span>';
+
+  return `
+    <div class="border rounded-xl p-4 bg-white/80 space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs text-blue-600 font-bold">${esc(r.id)}</span>
+            <span class="badge ${statusBadge}">${esc(status)}</span>
+            <span class="badge ${r.assessment === 'Accept' ? 'bg-orange-100 text-orange-800' : 'bg-purple-100 text-purple-800'}">${esc(r.assessment)}</span>
+          </div>
+          <h4 class="font-bold text-gray-800 mt-1">${esc(r.threat)}</h4>
+          <p class="text-xs text-gray-500 mt-0.5">${esc(asset?.name || r.assetId)} · Owner: ${esc(r.owner || 'Not assigned')}</p>
+        </div>
+        <div class="flex gap-2">
+          <span class="badge ${inLevel[1]}">Inherent ${inScore} · ${inLevel[0]}</span>
+          <span class="badge ${resLevel[1]}">Residual ${resScore} · ${resLevel[0]}</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+        <div><div class="text-xs text-gray-500 font-semibold uppercase">Vulnerability</div><div>${esc(r.vuln || 'Not provided')}</div></div>
+        <div><div class="text-xs text-gray-500 font-semibold uppercase">Responsible / Deadline</div><div>${esc(r.responsible || 'Unassigned')} · ${esc(r.deadline || 'No deadline')}</div></div>
+        <div><div class="text-xs text-gray-500 font-semibold uppercase">Acceptance Expiry</div><div>${esc(r.acceptanceExpiry || 'N/A')}</div></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-sm">
+        <div><div class="text-xs text-gray-500 font-semibold uppercase mb-1">Controls</div><div class="flex flex-wrap gap-1">${controls}</div></div>
+        <div><div class="text-xs text-gray-500 font-semibold uppercase mb-1">Evidence</div><div class="flex flex-wrap gap-1">${evidence}</div></div>
+      </div>
+      <div class="text-sm"><div class="text-xs text-gray-500 font-semibold uppercase">Treatment Action Plan</div><div>${esc(r.actionPlan || 'No treatment action plan recorded.')}</div></div>
+      <details class="text-sm">
+        <summary class="cursor-pointer text-blue-600 font-semibold">Comments / review notes</summary>
+        <div class="mt-2 space-y-2">${comments}</div>
+      </details>
+      <div class="flex justify-end gap-2 pt-1">
+        <button onclick="openRiskEditFromSummary('${esc(r.id)}')" class="border rounded px-3 py-1.5 text-xs hover:bg-gray-50">Edit Risk</button>
+      </div>
+    </div>`;
+}
+
+function openAssetSummaryModal(assetId) {
+  const a = assets.find(x => x.id === assetId); if(!a) return;
+  currentSummaryAssetId = assetId;
+  const relatedRisks = risks.filter(r => r.assetId === assetId);
+  const v = assetValue(a), [critLabel, critClass] = criticality(v);
+  const residualScores = relatedRisks.map(r => r.resImpact * r.resLikelihood);
+  const highOrCritical = relatedRisks.filter(r => ['High','Critical'].includes(riskLevel(r.resImpact*r.resLikelihood)[0])).length;
+  const overdue = relatedRisks.filter(isOverdue).length;
+  const accepted = relatedRisks.filter(r => r.assessment === 'Accept').length;
+  const maxResidual = residualScores.length ? Math.max(...residualScores) : 0;
+  const maxResidualLevel = residualScores.length ? riskLevel(maxResidual) : ['N/A','bg-gray-100 text-gray-700'];
+  const evidence = (a.evidence && a.evidence.length) ? a.evidence.map(e => `<span class="badge bg-blue-100 text-blue-800">${esc(e)}</span>`).join('') : '<span class="text-xs text-gray-400">No evidence uploaded</span>';
+  const notes = a.notes ? esc(a.notes) : 'No notes provided.';
+
+  document.getElementById('asset-summary-title').textContent = `${a.id} – ${a.name}`;
+  document.getElementById('asset-summary-content').innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="bg-gray-50 rounded-xl p-3"><div class="text-xs text-gray-500">Asset Value</div><div class="text-2xl font-bold">${v}</div><span class="badge ${critClass}">${critLabel}</span></div>
+      <div class="bg-gray-50 rounded-xl p-3"><div class="text-xs text-gray-500">Connected Risks</div><div class="text-2xl font-bold">${relatedRisks.length}</div><span class="text-xs text-gray-500">registered</span></div>
+      <div class="bg-gray-50 rounded-xl p-3"><div class="text-xs text-gray-500">High / Critical</div><div class="text-2xl font-bold text-red-600">${highOrCritical}</div><span class="text-xs text-gray-500">residual</span></div>
+      <div class="bg-gray-50 rounded-xl p-3"><div class="text-xs text-gray-500">Overdue Plans</div><div class="text-2xl font-bold ${overdue ? 'text-red-600' : 'text-gray-700'}">${overdue}</div><span class="text-xs text-gray-500">actions</span></div>
+      <div class="bg-gray-50 rounded-xl p-3"><div class="text-xs text-gray-500">Max Residual</div><div class="text-2xl font-bold">${maxResidual || '-'}</div><span class="badge ${maxResidualLevel[1]}">${maxResidualLevel[0]}</span></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 border rounded-xl p-4 bg-white/80">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+          <div>
+            <h4 class="font-bold text-gray-800">Asset information</h4>
+            <p class="text-xs text-gray-500">${esc(a.process)} · ${esc(a.department)}</p>
+          </div>
+          <span class="badge ${a.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}">${esc(a.status)}</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Business Owner</div><div>${esc(a.busOwner)}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">IT Owner</div><div>${esc(a.itOwner)}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Applicant</div><div>${esc(a.applicantName)}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Data Class</div><div>${esc(a.dataClass)}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Submitted</div><div>${esc(a.submittedAt || 'N/A')}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Next Review</div><div>${esc(a.reviewDate || 'Not set')}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">CIA Score</div><div class="font-mono">${a.c}–${a.i}–${a.a}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Accepted Risks</div><div>${accepted}</div></div>
+          <div><div class="text-xs text-gray-500 font-semibold uppercase">Evidence</div><div class="flex flex-wrap gap-1">${evidence}</div></div>
+        </div>
+        <div class="mt-4 text-sm"><div class="text-xs text-gray-500 font-semibold uppercase">Notes</div><div>${notes}</div></div>
+      </div>
+      <div class="border rounded-xl p-4 bg-white/80">
+        <h4 class="font-bold text-gray-800">Scope tags</h4>
+        <div class="mt-3 flex flex-wrap gap-1">
+          ${a.pci==='Yes'?'<span class="badge bg-purple-100 text-purple-800">PCI DSS</span>':'<span class="badge bg-gray-100 text-gray-700">Non-PCI</span>'}
+          ${a.criticalProcess==='Yes'?'<span class="badge bg-red-100 text-red-800">Critical Process</span>':'<span class="badge bg-gray-100 text-gray-700">Non-critical</span>'}
+          ${a.internet==='Yes'?'<span class="badge bg-blue-100 text-blue-800">Internet-facing</span>':'<span class="badge bg-gray-100 text-gray-700">Internal-facing</span>'}
+          ${a.thirdParty==='Yes'?'<span class="badge bg-yellow-100 text-yellow-800">3rd Party Dependency</span>':'<span class="badge bg-gray-100 text-gray-700">No 3rd Party</span>'}
+          ${a.cloud==='Yes'?'<span class="badge bg-sky-100 text-sky-800">Cloud-hosted</span>':'<span class="badge bg-gray-100 text-gray-700">On-prem / internal</span>'}
+        </div>
+        <div class="mt-5 space-y-2">
+          <button onclick="viewAssetRiskTable('${esc(a.id)}')" class="w-full border rounded px-3 py-2 text-sm hover:bg-gray-50">Open Risk Register View</button>
+          <button onclick="openRiskModalForAsset('${esc(a.id)}')" class="w-full bg-red-600 text-white rounded px-3 py-2 text-sm font-semibold">+ Log Risk for Asset</button>
+          <button onclick="openAssetEditFromSummary('${esc(a.id)}')" class="w-full border rounded px-3 py-2 text-sm hover:bg-gray-50">Edit Asset</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-bold text-gray-800">Risks connected to this asset</h4>
+        <span class="text-xs text-gray-500">${relatedRisks.length} item${relatedRisks.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="space-y-3">
+        ${relatedRisks.length ? relatedRisks.map(renderRiskSummaryRow).join('') : '<div class="border rounded-xl p-6 text-center text-gray-400 bg-white/80">No risks are connected to this asset yet.</div>'}
+      </div>
+    </div>`;
+
+  document.getElementById('asset-summary-modal').classList.remove('hidden');
+  document.getElementById('asset-summary-modal').classList.add('flex');
+}
+
+// ═══════ RISK MODAL LOGIC ═══════
+let riskEvidenceArr=[];
+let riskCommentsArr=[];
+
+function openRiskModal(editId) {
+  if(!selectedAssetId && !editId) { toast('Select an asset first.','bg-orange-600'); return; }
+  riskEvidenceArr=[]; riskCommentsArr=[];
+  document.getElementById('risk-form').reset();
+  document.getElementById('r-evidence-list').innerHTML='';
+  document.getElementById('r-edit-id').value='';
+  document.getElementById('r-delete-btn').classList.add('hidden');
+  document.getElementById('risk-modal-title').textContent='Log New Risk';
+  document.getElementById('r-other-wrapper').classList.add('hidden');
+  
+  // Reset tabs
+  switchTab('risk-tab-basic');
+  document.querySelectorAll('.r-control').forEach(c=>c.checked=false);
+  document.getElementById('acceptance-expiry-wrapper').classList.add('hidden');
+  renderCommentsPanel(); updateRiskPreview();
+
+  if(editId) {
+    const r=risks.find(x=>x.id===editId); if(!r) return;
+    document.getElementById('risk-modal-title').textContent=`Edit Risk — ${r.id}`;
+    document.getElementById('r-edit-id').value=r.id;
+    document.getElementById('r-delete-btn').classList.remove('hidden');
+    
+    const sel=document.getElementById('r-threat-select');
+    if([...sel.options].some(o=>o.value===r.threat)) { sel.value=r.threat; }
+    else { sel.value='__OTHER__'; document.getElementById('r-other-wrapper').classList.remove('hidden'); setField('r-threat-other',r.threat); }
+    
+    setField('r-vuln',r.vuln); setField('r-owner',r.owner); setField('r-assessment',r.assessment);
+    setField('r-impact',r.impact); setField('r-likelihood',r.likelihood);
+    setField('r-res-impact',r.resImpact); setField('r-res-likelihood',r.resLikelihood);
+    setField('r-action-plan',r.actionPlan||''); setField('r-responsible',r.responsible||'');
+    setField('r-deadline',r.deadline||''); setField('r-treatment-status',r.treatmentStatus||'Open');
+    setField('r-acceptance-expiry',r.acceptanceExpiry||'');
+    
+    if(r.assessment==='Accept') document.getElementById('acceptance-expiry-wrapper').classList.remove('hidden');
+    r.controls.forEach(cv=>{ const chk=[...document.querySelectorAll('.r-control')].find(c=>c.value===cv); if(chk) chk.checked=true; });
+    
+    riskEvidenceArr=[...(r.evidence||[])];
+    renderEvidenceTags('r-evidence-list',riskEvidenceArr,removeRiskEvidence);
+    riskCommentsArr=[...(r.comments||[])];
+    renderCommentsPanel(); updateRiskPreview();
+  }
+  document.getElementById('risk-modal').classList.remove('hidden');
+  document.getElementById('risk-modal').classList.add('flex');
+}
+
+function closeRiskModal(returnToSummary=true) { 
+  document.getElementById('risk-modal').classList.add('hidden'); 
+  document.getElementById('risk-modal').classList.remove('flex'); 
+  if(returnToSummary && summaryReturnAssetId) {
+    const id = summaryReturnAssetId;
+    summaryReturnAssetId = null;
+    if(assets.some(a => a.id === id)) openAssetSummaryModal(id);
+  }
+}
+
+function switchTab(tabId) {
+  const tabs=['risk-tab-basic','risk-tab-controls','risk-tab-treatment','risk-tab-comments'];
+  const btns=['tab-btn-basic','tab-btn-controls','tab-btn-treatment','tab-btn-comments'];
+  tabs.forEach((t,i)=>{ 
+    document.getElementById(t).classList.toggle('hidden',t!==tabId); 
+    document.getElementById(btns[i]).classList.toggle('active',btns[i]==='tab-btn-'+tabId.replace('risk-tab-','')); 
+  });
+}
+
+function toggleOtherThreat() { 
+  const show=document.getElementById('r-threat-select').value==='__OTHER__'; 
+  document.getElementById('r-other-wrapper').classList.toggle('hidden',!show); 
+  document.getElementById('r-threat-other').required=show; 
+}
+
+function toggleAcceptanceDate() { 
+  document.getElementById('acceptance-expiry-wrapper').classList.toggle('hidden',getField('r-assessment')!=='Accept'); 
+}
+
+function updateRiskPreview() {
+  const imp=Number(getField('r-impact')||5), lik=Number(getField('r-likelihood')||3);
+  const rImp=Number(getField('r-res-impact')||3), rLik=Number(getField('r-res-likelihood')||2);
+  const iScore=imp*lik, rScore=rImp*rLik;
+  const iL=riskLevel(iScore), rL=riskLevel(rScore);
+  const ip=document.getElementById('inherent-preview'), rp=document.getElementById('residual-preview');
+  if(ip) { ip.className=`mt-3 text-center font-bold text-sm py-2 rounded ${iL[1]}`; ip.textContent=`Score: ${iScore} — ${iL[0]}`; }
+  if(rp) { rp.className=`mt-3 text-center font-bold text-sm py-2 rounded ${rL[1]}`; rp.textContent=`Score: ${rScore} — ${rL[0]}`; }
+}
+
+function addRiskEvidenceItem() { 
+  const val=getField('r-evidence-name'); if(!val) return; 
+  riskEvidenceArr.push(val); setField('r-evidence-name',''); 
+  renderEvidenceTags('r-evidence-list',riskEvidenceArr,removeRiskEvidence); 
+}
+
+function removeRiskEvidence(i) { 
+  riskEvidenceArr.splice(i,1); 
+  renderEvidenceTags('r-evidence-list',riskEvidenceArr,removeRiskEvidence); 
+}
+
+function addCommentInModal() { 
+  const val=getField('r-new-comment'); if(!val) return; 
+  const ts=new Date().toISOString().slice(0,16).replace('T',' '); 
+  riskCommentsArr.push(`[${ts}] ${val}`); setField('r-new-comment',''); 
+  renderCommentsPanel(); 
+}
+
+function renderCommentsPanel() {
+  const el=document.getElementById('r-comments-list'); if(!el) return;
+  if(!riskCommentsArr.length) { el.innerHTML='<p class="text-xs text-gray-400">No comments yet.</p>'; return; }
+  el.innerHTML=riskCommentsArr.map((c,i)=>`<div class="comment-bubble flex justify-between items-start gap-2"><span>${esc(c)}</span><button type="button" onclick="deleteComment(${i})" class="text-gray-400 hover:text-red-500 text-xs font-bold flex-shrink-0">✕</button></div>`).join('');
+}
+
+function deleteComment(i) { 
+  riskCommentsArr.splice(i,1); 
+  renderCommentsPanel(); 
+}
+
+function saveRisk(e) {
+  e.preventDefault();
+  const editId=getField('r-edit-id');
+  let threatVal=getField('r-threat-select');
+  let customThreat=false;
+  if(threatVal==='__OTHER__') { threatVal=getField('r-threat-other'); customThreat=true; }
+  if(!threatVal) { toast('Select or enter a threat type.','bg-orange-600'); return; }
+  
+  const checked=[...document.querySelectorAll('.r-control:checked')].map(c=>c.value);
+  const customCtrl=getField('r-custom-control'); if(customCtrl) checked.push(customCtrl);
+  
+  const obj = {
+    id: editId||genId('RSK',risks),
+    assetId: selectedAssetId || (editId? risks.find(x=>x.id===editId)?.assetId : null),
+    threat:threatVal, vuln:getField('r-vuln'), owner:getField('r-owner'),
+    impact:Number(getField('r-impact')), likelihood:Number(getField('r-likelihood')),
+    resImpact:Number(getField('r-res-impact')), resLikelihood:Number(getField('r-res-likelihood')),
+    assessment:getField('r-assessment'), customThreat, controls:checked, actionPlan:getField('r-action-plan'),
+    responsible:getField('r-responsible'), deadline:getField('r-deadline'), treatmentStatus:getField('r-treatment-status'),
+    acceptanceExpiry:getField('r-acceptance-expiry'), evidence:[...riskEvidenceArr], comments:[...riskCommentsArr],
+    submittedAt: editId ? (risks.find(x=>x.id===editId)?.submittedAt||today) : today
+  };
+  
+  if(editId) { const idx=risks.findIndex(x=>x.id===editId); if(idx!==-1) risks[idx]=obj; toast('Risk updated','bg-green-700'); }
+  else { risks.push(obj); toast('Risk logged','bg-green-700'); }
+  
+  const returnId = summaryReturnAssetId || currentSummaryAssetId;
+  summaryReturnAssetId = null;
+  closeRiskModal(false); renderRisks(); renderDashboard();
+  if(returnId && assets.some(a => a.id === returnId)) openAssetSummaryModal(returnId);
+}
+
+function confirmDeleteRisk(id) {
+  const target=id||getField('r-edit-id'); if(!target) return;
+  const r=risks.find(x=>x.id===target); if(!r) return;
+  showConfirm(`Delete risk "${r.id}"?`,`Threat: "${r.threat}". This cannot be undone.`,()=>{
+    const returnId = summaryReturnAssetId || currentSummaryAssetId || r.assetId;
+    summaryReturnAssetId = null;
+    risks=risks.filter(x=>x.id!==target); closeRiskModal(false); renderRisks(); renderDashboard(); if(returnId && assets.some(a => a.id === returnId)) openAssetSummaryModal(returnId); toast('Risk deleted','bg-red-700');
+  });
+}
+
+// ═══════ RISK FILTER & RENDER ═══════
+function getFilteredRisks() {
+  let arr = risks;
+
+  // Global Filter Override
+  if (globalFilter.type) {
+    if(globalFilter.type === 'allRisks') arr = risks;
+    else if(globalFilter.type === 'riskLevel') arr = arr.filter(r => ['High','Critical'].includes(riskLevel(r.resImpact*r.resLikelihood)[0]));
+    else if(globalFilter.type === 'riskStatus') arr = arr.filter(r => !isOverdue(r) && r.treatmentStatus === globalFilter.value);
+    else if(globalFilter.type === 'riskOverdue') arr = arr.filter(isOverdue);
+    else if(globalFilter.type === 'riskAssessment') arr = arr.filter(r => r.assessment === globalFilter.value);
+    else if(globalFilter.type === 'riskHeat') arr = arr.filter(r => r.resImpact === globalFilter.value.i && r.resLikelihood === globalFilter.value.l);
+    else if(globalFilter.type === 'riskDept') arr = arr.filter(r => { const a = assets.find(x=>x.id===r.assetId); return a && a.department === globalFilter.value; });
+    else if(globalFilter.type === 'riskThreat') arr = arr.filter(r => r.threat === globalFilter.value);
+    else if(globalFilter.type === 'riskOverdueOwner') arr = arr.filter(r => isOverdue(r) && (r.responsible||'Unassigned') === globalFilter.value);
+    else if(globalFilter.type === 'riskAcceptedDept') arr = arr.filter(r => r.assessment === 'Accept' && assets.find(x=>x.id===r.assetId)?.department === globalFilter.value);
+    else if(globalFilter.type === 'riskControlCount') {
+      arr = arr.filter(r => {
+        const c = r.controls.length;
+        if(globalFilter.value === 0) return c === 0;
+        if(globalFilter.value === 1) return c >= 1 && c <= 2;
+        if(globalFilter.value === 2) return c >= 3;
+      });
+    }
+  } 
+  // Local Asset Selection
+  else if (selectedAssetId) {
+    arr = arr.filter(r => r.assetId === selectedAssetId);
+  } else {
+    return []; // No filter, no asset = empty
+  }
+
+  // Local Risk Table Filters
+  const lvl=document.getElementById('risk-level-filter').value;
+  const st=document.getElementById('risk-status-filter').value;
+  const dec=document.getElementById('risk-assessment-filter').value;
+  
+  return arr.filter(r=>{
+    const l=riskLevel(r.resImpact*r.resLikelihood)[0];
+    const status=isOverdue(r)?'Overdue':r.treatmentStatus;
+    if(lvl && l!==lvl) return false;
+    if(st && status!==st) return false;
+    if(dec && r.assessment!==dec) return false;
+    return true;
+  });
+}
+
+function renderRisks() {
+  const tbody=document.getElementById('risk-tbody'); tbody.innerHTML='';
+  const arr=getFilteredRisks();
+  if(!arr.length) { tbody.innerHTML='<tr><td colspan="10" class="px-4 py-6 text-center text-gray-400">No risks match criteria.</td></tr>'; return; }
+  
+  arr.forEach(r=>{
+    const inScore=r.impact*r.likelihood, resScore=r.resImpact*r.resLikelihood;
+    const inL=riskLevel(inScore), resL=riskLevel(resScore);
+    const status=isOverdue(r)?'Overdue':r.treatmentStatus;
+    const sBadge=status==='Overdue'?'bg-red-100 text-red-800':status==='Completed'?'bg-green-100 text-green-800':status==='In Progress'?'bg-blue-100 text-blue-800':'bg-gray-100 text-gray-700';
+    const safe = Object.fromEntries(Object.entries(r).map(([k,v]) => [k, esc(v)]));
+    const tr=document.createElement('tr'); tr.className='risk-row';
+    tr.innerHTML=`
+      <td class="px-4 py-3 font-mono text-xs text-gray-600 font-semibold">${safe.id}</td>
+      <td class="px-4 py-3 font-mono text-xs text-blue-600 font-semibold hover:underline" onclick="event.stopPropagation();openAssetSummaryModal('${safe.assetId}')">${safe.assetId}</td>
+      <td class="px-4 py-3 font-medium text-gray-800 max-w-[160px]">${safe.threat}</td>
+      <td class="px-4 py-3 text-gray-500 text-xs max-w-[160px]">${safe.vuln}</td>
+      <td class="px-4 py-3 text-sm">${safe.owner}</td>
+      <td class="px-4 py-3 text-center"><span class="badge ${inL[1]}">${inScore}<br><span class="font-normal">${inL[0]}</span></span></td>
+      <td class="px-4 py-3 text-center"><span class="badge ${resL[1]}">${resScore}<br><span class="font-normal">${resL[0]}</span></span></td>
+      <td class="px-4 py-3"><div class="font-semibold text-sm">${safe.assessment}</div><div class="text-xs text-gray-400">Due: ${safe.deadline||'N/A'}</div></td>
+      <td class="px-4 py-3"><span class="badge ${sBadge}">${status}</span></td>
+      <td class="px-4 py-3 flex gap-2 text-xs">
+        <button onclick="openRiskModal('${safe.id}')" class="text-blue-600 hover:underline">Edit</button>
+        <button onclick="confirmDeleteRisk('${safe.id}')" class="text-red-500 hover:underline">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function showRiskHeatMapModal() {
+  const el=document.getElementById('heatmap-content');
+  let arr = getFilteredRisks(); // Show heatmap for currently visible risks
+  
+  let html='<div class="overflow-x-auto"><table class="text-xs mx-auto"><tr><td class="w-16"></td>';
+  for(let imp=1;imp<=5;imp++) html+=`<td class="text-center font-semibold text-gray-500 px-1 pb-2">Impact ${imp}</td>`;
+  html+='</tr>';
+  for(let lik=5;lik>=1;lik--) {
+    html+=`<tr><td class="text-xs text-gray-500 font-semibold pr-2 text-right w-20">L ${lik}</td>`;
+    for(let imp=1;imp<=5;imp++) {
+      const score=imp*lik; const [lvl,cls]=riskLevel(score);
+      const cell=arr.filter(r=>r.resImpact===imp&&r.resLikelihood===lik);
+      const bg=score<=4?'#dcfce7':score<=9?'#fef9c3':score<=14?'#fed7aa':'#fee2e2';
+      html+=`<td class="p-0.5"><div class="heat-cell" style="background:${bg};width:60px;height:48px;" title="${lvl} (${score})">${cell.length?`<span class="text-gray-800 font-bold">${cell.length}</span>`:''}</div></td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</table><div class="flex gap-3 justify-center mt-4 text-xs"><span class="flex items-center gap-1"><span style="background:#dcfce7" class="inline-block w-4 h-4 rounded"></span>Low</span><span class="flex items-center gap-1"><span style="background:#fef9c3" class="inline-block w-4 h-4 rounded"></span>Medium</span><span class="flex items-center gap-1"><span style="background:#fed7aa" class="inline-block w-4 h-4 rounded"></span>High</span><span class="flex items-center gap-1"><span style="background:#fee2e2" class="inline-block w-4 h-4 rounded"></span>Critical</span></div><p class="text-xs text-gray-400 text-center mt-3">Numbers = count of residual risks in that cell</p>';
+  if(arr.length===0) html='<p class="text-gray-500 text-sm text-center py-8">No risks match current criteria.</p>';
+  el.innerHTML=html; document.getElementById('heatmap-modal').classList.remove('hidden'); document.getElementById('heatmap-modal').classList.add('flex');
+}
+
+// ═══════ CONFIRM MODAL ═══════
+let _confirmCb=null;
+function showConfirm(title,msg,cb) {
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  _confirmCb=cb;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('confirm-modal').classList.add('flex');
+}
+function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); document.getElementById('confirm-modal').classList.remove('flex'); _confirmCb=null; }
+document.getElementById('confirm-ok').onclick=function(){ if(_confirmCb) _confirmCb(); closeConfirm(); };
+
+// INIT
+renderDashboard();
+renderAssets();
+</script>
+</body>
+</html>

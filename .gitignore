@@ -1,0 +1,15 @@
+# Python virtualenv (machine-specific, not part of the project)
+.venv/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
