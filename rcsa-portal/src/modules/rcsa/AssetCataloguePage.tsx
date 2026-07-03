@@ -1,25 +1,205 @@
+import { useMemo, useState } from 'react';
+import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
-import { PageHeader } from './PageHeader';
-import { AssetFilters } from '../../components/assets/AssetFilters';
-import { AssetTable } from '../../components/assets/AssetTable';
+import { Pill } from '../../components/common/Pill';
+import { Pagination, usePaged } from '../../components/common/Pagination';
+import {
+  ChartGrid,
+  ChartPanel,
+  DonutChart,
+  HBarChart,
+  useChartFilter,
+  type BarRow,
+  type DonutSegment,
+  type Tone,
+} from '../../components/charts/primitives';
+import { assetValue, criticality, today } from '../../domain/scoring';
+import { exportAssetsCsv } from '../../csv/export';
+import type { Asset, DataClass } from '../../data/models';
 
-// Asset Catalogue — own filter + table. Clicking a row opens the asset summary
-// popup (the old inline detail panel is gone; the popup already shows it all).
+// Asset Catalogue — SentinelGRC visual design ported onto OUR existing asset model
+// and shared store. Add / edit / delete / summary still flow through ModalsProvider,
+// so audit diffs and RBAC keep working exactly as before. The protected Risk /
+// Treatment modules and the shared data layer are untouched.
+
+const CRIT_TONE: Record<string, Tone> = { High: 'crit', Medium: 'med', Low: 'low' };
+const CRIT_ORDER = ['High', 'Medium', 'Low'] as const;
+
+const CLASSES: DataClass[] = ['Public', 'Internal', 'Confidential', 'Personal Data', 'Payment Data'];
+const CLS_TONE: Record<DataClass, Tone> = {
+  Public: 'mut',
+  Internal: 'info',
+  Confidential: 'med',
+  'Personal Data': 'high',
+  'Payment Data': 'crit',
+};
+
+const FLAGS: { label: string; has: (a: Asset) => boolean }[] = [
+  { label: 'Internet-facing', has: (a) => a.internet === 'Yes' },
+  { label: 'PCI', has: (a) => a.pci === 'Yes' },
+  { label: 'Third-party', has: (a) => a.thirdParty === 'Yes' },
+  { label: 'Cloud', has: (a) => a.cloud === 'Yes' },
+  { label: 'Critical process', has: (a) => a.criticalProcess === 'Yes' },
+];
+
+const statusTone = (s: Asset['status']): Tone => (s === 'Approved' ? 'low' : s === 'Needs Update' ? 'med' : 'mut');
+
 export function AssetCataloguePage() {
+  const store = useStore();
   const modals = useModals();
   const perms = usePermissions('asset-catalogue');
+  const filter = useChartFilter<Asset>();
+  const [q, setQ] = useState('');
+
+  const assets = store.assets;
+  const critLabel = (a: Asset) => criticality(assetValue(a))[0];
+
+  // ── Charts (computed live from the full dataset) ──
+  const critSeg: DonutSegment[] = CRIT_ORDER.map((b) => ({
+    key: `crit:${b}`, label: b, tone: CRIT_TONE[b], value: assets.filter((a) => critLabel(a) === b).length,
+  }));
+  const clsRows: BarRow[] = CLASSES.map((c) => ({
+    key: `cls:${c}`, label: c, tone: CLS_TONE[c], value: assets.filter((a) => a.dataClass === c).length,
+  }));
+  const flagRows: BarRow[] = FLAGS.map((f) => ({
+    key: `flag:${f.label}`, label: f.label, tone: 'high', value: assets.filter(f.has).length,
+  }));
+
+  const selectCrit = (key: string) => { const b = key.slice(5); filter.select(key, b, (a) => critLabel(a) === b); };
+  const selectCls = (key: string) => { const c = key.slice(4) as DataClass; filter.select(key, c, (a) => a.dataClass === c); };
+  const selectFlag = (key: string) => { const l = key.slice(5); const f = FLAGS.find((x) => x.label === l); if (f) filter.select(key, l, f.has); };
+  const chipFor = (prefix: string) => (filter.active && filter.active.key.startsWith(prefix) ? filter.active.label : null);
+
+  // ── Table rows: search combined with the active chart slice ──
+  const searched = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return assets;
+    return assets.filter((a) => [a.id, a.name, a.process, a.department, a.busOwner, a.itOwner, a.dataClass].join(' ').toLowerCase().includes(s));
+  }, [assets, q]);
+  const rows = filter.apply(searched);
+  const pager = usePaged(rows);
+
+  const riskCount = useMemo(() => {
+    const m = new Map<string, number>();
+    store.risks.forEach((r) => r.assetIds.forEach((id) => m.set(id, (m.get(id) || 0) + 1)));
+    return m;
+  }, [store.risks]);
+
+  const stats: { l: string; v: number; t?: Tone }[] = [
+    { l: 'Assets', v: assets.length },
+    { l: 'High criticality', v: assets.filter((a) => critLabel(a) === 'High').length, t: 'crit' },
+    { l: 'Internet-facing', v: assets.filter((a) => a.internet === 'Yes').length, t: 'high' },
+    { l: 'Reviews overdue', v: assets.filter((a) => a.reviewDate && a.reviewDate < today).length, t: 'med' },
+  ];
 
   return (
-    <>
-      <PageHeader>
-        {perms.create && <button onClick={() => modals.newAsset()} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow">+ New Asset</button>}
-      </PageHeader>
-
-      <div className="p-6 space-y-4">
-        <AssetFilters />
-        <AssetTable />
+    <div className="p-6 space-y-4">
+      {/* Stat strip */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))' }}>
+        {stats.map((s) => (
+          <div key={s.l} className="section-card p-4">
+            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
+            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
+          </div>
+        ))}
       </div>
-    </>
+
+      {/* Interactive charts */}
+      <ChartGrid>
+        <ChartPanel title="Criticality distribution" span={4} filterLabel={chipFor('crit:')} onClearFilter={filter.clear}>
+          <DonutChart segments={critSeg} center={String(assets.length)} sub="assets" activeKey={filter.activeKey} onSelect={selectCrit} />
+        </ChartPanel>
+        <ChartPanel title="By classification" span={4} filterLabel={chipFor('cls:')} onClearFilter={filter.clear}>
+          <HBarChart rows={clsRows} activeKey={filter.activeKey} onSelect={selectCls} />
+        </ChartPanel>
+        <ChartPanel title="Exposure flags" span={4} filterLabel={chipFor('flag:')} onClearFilter={filter.clear}>
+          <HBarChart rows={flagRows} activeKey={filter.activeKey} onSelect={selectFlag} />
+        </ChartPanel>
+      </ChartGrid>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search assets…"
+          className="border rounded-lg px-3 py-2 text-sm"
+          style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+        />
+        {filter.active && (
+          <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>
+            Filtered: {filter.active.label} ✕
+          </button>
+        )}
+        <div className="flex-1" />
+        {perms.export && <button onClick={() => exportAssetsCsv(rows)} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        {perms.create && <button onClick={() => modals.newAsset()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Asset</button>}
+      </div>
+
+      {/* Table */}
+      <div className="section-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
+              <tr>
+                <th className="text-left px-4 py-3">Asset #</th>
+                <th className="text-left px-4 py-3">Name / Process</th>
+                <th className="text-left px-4 py-3">Owners</th>
+                <th className="text-center px-4 py-3">C·I·A</th>
+                <th className="text-left px-4 py-3">Criticality</th>
+                <th className="text-left px-4 py-3">Classification</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-left px-4 py-3">Review</th>
+                <th className="text-left px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pager.pageItems.length === 0 ? (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No assets match{filter.active ? ' the selected chart slice' : ''}.</td></tr>
+              ) : pager.pageItems.map((a) => {
+                const v = assetValue(a);
+                const cl = critLabel(a);
+                const rc = riskCount.get(a.id) || 0;
+                const overdue = !!a.reviewDate && a.reviewDate < today;
+                return (
+                  <tr key={a.id} className="risk-row cursor-pointer" onClick={() => modals.openSummary(a.id)}>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{a.id}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold" style={{ color: 'var(--text)' }}>{a.name}</div>
+                      <div className="text-xs" style={{ color: 'var(--text3)' }}>{a.process} · {a.department}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div style={{ color: 'var(--text2)' }}>{a.busOwner}</div>
+                      <div className="text-xs" style={{ color: 'var(--text3)' }}>{a.itOwner}</div>
+                    </td>
+                    <td className="px-4 py-3 text-center font-mono whitespace-nowrap" style={{ color: 'var(--text2)' }}>{a.c}·{a.i}·{a.a}</td>
+                    <td className="px-4 py-3"><Pill text={`${cl} (${v})`} k={CRIT_TONE[cl]} /></td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-2">
+                        <Pill text={a.dataClass} k={CLS_TONE[a.dataClass]} />
+                        <span className="text-[11px]" style={{ color: 'var(--text3)' }}>{rc} risk{rc !== 1 ? 's' : ''}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3"><Pill text={a.status} k={statusTone(a.status)} /></td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      {a.reviewDate ? (overdue ? <Pill text={`${a.reviewDate} · due`} k="crit" /> : <span style={{ color: 'var(--text2)' }}>{a.reviewDate}</span>) : '—'}
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-3 text-xs">
+                        {perms.edit && <button onClick={() => modals.editAsset(a.id)} className="text-blue-600 hover:underline">Edit</button>}
+                        {perms.remove && <button onClick={() => modals.deleteAssetFlow(a.id)} className="text-red-500 hover:underline">Delete</button>}
+                        {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={pager.page} pageCount={pager.pageCount} pageSize={pager.pageSize} total={pager.total} start={pager.start} onPage={pager.setPage} onPageSize={pager.setPageSize} />
+      </div>
+    </div>
   );
 }
