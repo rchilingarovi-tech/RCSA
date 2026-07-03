@@ -1,5 +1,5 @@
-import type { Asset, Risk } from '../data/models';
-import { assetValue, criticality, riskLevel, isOverdue, today } from '../domain/scoring';
+import type { Asset, Risk, Treatment } from '../data/models';
+import { assetValue, criticality, riskLevel, residualScore, riskStatus, treatmentStatus, today } from '../domain/scoring';
 
 // CSV export — ported from New Version.html L560-591.
 
@@ -35,26 +35,43 @@ export function exportAssetsCsv(assets: Asset[]): void {
   downloadCsv(`rcsa-assets-${today}.csv`, rows);
 }
 
-export function exportRisksCsv(risks: Risk[], assets: Asset[]): void {
+export function exportRisksCsv(risks: Risk[], assets: Asset[], treatments: Treatment[]): void {
   const rows: (string | number)[][] = [
     [
       'Risk ID', 'Asset ID', 'Asset Name', 'Threat', 'Vulnerability', 'Owner',
       'Inherent Score', 'Inherent Level', 'Residual Score', 'Residual Level', 'Decision',
-      'Treatment Status', 'Responsible', 'Deadline', 'Overdue', 'Controls', 'Action Plan',
-      'Acceptance Expiry', 'Submitted At',
+      'Treatment Status', 'Treatments', 'Controls', 'Acceptance Expiry', 'Submitted At',
     ],
   ];
   risks.forEach((r) => {
-    const a = assets.find((x) => x.id === r.assetId);
+    const linked = r.assetIds.map((id) => assets.find((x) => x.id === id)).filter(Boolean) as typeof assets;
+    const assetIdCell = r.assetIds.join('; ');
+    const assetNameCell = linked.map((a) => a.name).join('; ');
+    const trtIds = treatments.filter((t) => t.riskIds.includes(r.id)).map((t) => t.id).join('; ');
     const inherent = r.impact * r.likelihood;
-    const residual = r.resImpact * r.resLikelihood;
+    const residual = residualScore(r);
     rows.push([
-      r.id, r.assetId, a?.name || '', r.threat, r.vuln, r.owner,
-      inherent, riskLevel(inherent)[0], residual, riskLevel(residual)[0], r.assessment,
-      isOverdue(r) ? 'Overdue' : r.treatmentStatus, r.responsible, r.deadline,
-      isOverdue(r) ? 'Yes' : 'No', (r.controls || []).join('; '), r.actionPlan,
+      r.id, assetIdCell, assetNameCell, r.threat, r.vuln, r.owner,
+      inherent, riskLevel(inherent)[0], residual ?? '', residual == null ? '' : riskLevel(residual)[0], r.assessment,
+      riskStatus(r, treatments), trtIds, (r.controls || []).join('; '),
       r.acceptanceExpiry, r.submittedAt,
     ]);
   });
   downloadCsv(`rcsa-risks-${today}.csv`, rows);
+}
+
+export function exportTreatmentsCsv(treatments: Treatment[]): void {
+  const rows: (string | number)[][] = [
+    [
+      'Treatment ID', 'Title', 'Risk IDs', 'Owner', 'Due Date', 'Status',
+      'Description', 'Evidence', 'Comments', 'Submitted At',
+    ],
+  ];
+  treatments.forEach((t) => {
+    rows.push([
+      t.id, t.title, t.riskIds.join('; '), t.owner, t.dueDate, treatmentStatus(t),
+      t.description, (t.evidence || []).join('; '), (t.comments || []).join(' | '), t.submittedAt,
+    ]);
+  });
+  downloadCsv(`rcsa-treatments-${today}.csv`, rows);
 }

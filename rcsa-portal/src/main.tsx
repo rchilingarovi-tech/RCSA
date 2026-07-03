@@ -2,18 +2,17 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
-import { AppStoreProvider } from './state/AppStore';
 import { UiProvider } from './components/common/UiProvider';
-import { ModalsProvider } from './state/ModalsProvider';
+import { ThemeProvider } from './state/ThemeProvider';
 
+// Global providers only. RCSA's data store + modals now live inside the RCSA
+// module (src/modules/rcsa) so each module owns its own data layer.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppStoreProvider>
+    <ThemeProvider>
       <UiProvider>
-        <ModalsProvider>
-          <App />
-        </ModalsProvider>
+        <App />
       </UiProvider>
-    </AppStoreProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

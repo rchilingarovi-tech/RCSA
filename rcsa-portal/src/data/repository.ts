@@ -1,4 +1,4 @@
-import type { Asset, Risk } from './models';
+import type { Asset, Risk, Treatment } from './models';
 
 /**
  * Swappable persistence boundary. Components and the store talk only to this
@@ -11,12 +11,17 @@ import type { Asset, Risk } from './models';
 export interface RcsaRepository {
   listAssets(): Promise<Asset[]>;
   listRisks(): Promise<Risk[]>;
+  listTreatments(): Promise<Treatment[]>;
   /** Upsert: replaces by id if present, otherwise appends. */
   saveAsset(asset: Asset): Promise<Asset>;
   saveRisk(risk: Risk): Promise<Risk>;
-  /** Deleting an asset cascades to its risks. */
+  saveTreatment(treatment: Treatment): Promise<Treatment>;
+  /** Deleting an asset unlinks it from risks (dropping orphaned risks), which in
+   *  turn unlinks those risks from treatments (dropping orphaned treatments). */
   deleteAsset(id: string): Promise<void>;
+  /** Deleting a risk unlinks it from treatments (dropping orphaned treatments). */
   deleteRisk(id: string): Promise<void>;
+  deleteTreatment(id: string): Promise<void>;
   /** Restore the original demo data set. */
-  resetToSeed(): Promise<{ assets: Asset[]; risks: Risk[] }>;
+  resetToSeed(): Promise<{ assets: Asset[]; risks: Risk[]; treatments: Treatment[] }>;
 }

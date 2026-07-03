@@ -1,0 +1,42 @@
+/* Design tokens — Dark Dashboard theme.
+   Dark navy page/chrome, light content cards, teal primary accent.
+   (Previous "cyber" palette preserved in tokens.cyber.css.bak.) */
+:root {
+  /* surfaces */
+  --bg-main: #eef2f7;        /* page background (soft light blue-gray) */
+  --bg-chrome: #ffffff;      /* sidebar / top bar panel */
+  --bg-chrome-2: #f2f3f5;    /* light callout */
+  --bg-card: #ffffff;        /* primary content card */
+  --bg-surface: #f2f3f5;     /* light warm gray surface */
+  --bg-surface-2: #eceef1;
+
+  /* borders */
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  /* accents */
+  --accent: #00c9b1;         /* teal — primary brand accent */
+  --accent-soft: #d6f7f2;
+  --accent-2: #8b5cf6;       /* purple */
+  --accent-2-soft: #ede9fe;
+  --blue: #3b82f6;
+  --blue-soft: #dbeafe;
+  --amber: #f5a623;
+  --amber-soft: #fef3c7;
+
+  /* status */
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --warning: #f5a623;
+  --warning-soft: #fef3c7;
+  --critical: #ef4444;
+  --critical-soft: #fee2e2;
+
+  /* text */
+  --text-main: #111827;          /* on light cards */
+  --text-muted: #6b7280;
+  --text-on-dark: #ffffff;       /* on dark page / chrome */
+  --text-on-dark-muted: rgba(255, 255, 255, 0.6);
+
+  --red: var(--critical);
+}

@@ -4,6 +4,7 @@ import { EvidenceTags } from '../common/EvidenceTags';
 import { Badge } from '../common/Badge';
 import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
+import { usePermissions } from '../../auth/usePermissions';
 import { useUi } from '../common/UiProvider';
 import { assetValue, criticality, genId, today } from '../../domain/scoring';
 import { ASSET_STATUSES, CIA_OPTIONS, DATA_CLASSES } from '../../domain/constants';
@@ -55,6 +56,7 @@ function fromAsset(a: Asset): FormShape {
 export function AssetModal({ editId }: { editId: string | null }) {
   const store = useStore();
   const modals = useModals();
+  const perms = usePermissions('asset-catalogue');
   const ui = useUi();
 
   const existing = editId ? store.assets.find((a) => a.id === editId) ?? null : null;
@@ -172,7 +174,7 @@ export function AssetModal({ editId }: { editId: string | null }) {
         <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} className={`${inputCls} md:col-span-2`} rows={2} placeholder="Notes / description" />
 
         <div className="md:col-span-2 flex justify-between items-center pt-4">
-          {editId ? (
+          {editId && perms.remove ? (
             <button type="button" onClick={() => modals.deleteAssetFlow(editId)} className="text-red-600 text-sm hover:underline">Delete asset</button>
           ) : (
             <span />

@@ -1,4 +1,4 @@
-import type { Asset, Risk } from '../data/models';
+import type { Asset, Risk, Treatment } from '../data/models';
 
 // Pure domain logic — ported verbatim from the prototype (New Version.html L544-548).
 
@@ -26,24 +26,59 @@ export function riskLevel(s: number): LevelTuple {
   return ['Critical', 'bg-red-100 text-red-800'];
 }
 
-export function isOverdue(r: Risk): boolean {
-  return !!r.deadline && r.treatmentStatus !== 'Completed' && r.deadline < today;
-}
-
 export function inherentScore(r: Risk): number {
   return r.impact * r.likelihood;
 }
 
-export function residualScore(r: Risk): number {
-  return r.resImpact * r.resLikelihood;
+/** Residual is assessed only when BOTH impact and likelihood are set. */
+export function hasResidual(r: Pick<Risk, 'resImpact' | 'resLikelihood'>): boolean {
+  return r.resImpact != null && r.resLikelihood != null;
 }
 
-/** Effective treatment status (Overdue overrides). */
-export function effectiveStatus(r: Risk): string {
-  return isOverdue(r) ? 'Overdue' : r.treatmentStatus;
+/** Residual score, or null when residual risk has not been assessed. */
+export function residualScore(r: Risk): number | null {
+  return hasResidual(r) ? (r.resImpact as number) * (r.resLikelihood as number) : null;
 }
 
-/** Badge classes for a treatment/effective status (ported from renderRisks L1422). */
+// ── Treatment status (Treatment is its own entity addressing risks) ──
+
+/** A treatment is overdue if its due date has passed and it isn't completed. */
+export function isOverdue(t: Treatment): boolean {
+  return !!t.dueDate && t.status !== 'Completed' && t.dueDate < today;
+}
+
+/** The effective status of a single treatment (Overdue overrides). */
+export function treatmentStatus(t: Treatment): string {
+  return isOverdue(t) ? 'Overdue' : t.status;
+}
+
+/** Treatments addressing a given risk. */
+export function treatmentsForRisk(treatments: Treatment[], riskId: string): Treatment[] {
+  return treatments.filter((t) => t.riskIds.includes(riskId));
+}
+
+/**
+ * A risk's treatment status rolled up from its treatments:
+ *   none → No Plan · any overdue → Overdue · all complete → Completed · else In Progress.
+ */
+export function rollupStatus(treatments: Treatment[]): string {
+  if (treatments.length === 0) return 'No Plan';
+  if (treatments.some(isOverdue)) return 'Overdue';
+  if (treatments.every((t) => t.status === 'Completed')) return 'Completed';
+  return 'In Progress';
+}
+
+/** Convenience: rollup status for a risk given the full treatment set. */
+export function riskStatus(risk: Risk, treatments: Treatment[]): string {
+  return rollupStatus(treatmentsForRisk(treatments, risk.id));
+}
+
+/** Whether a risk has at least one overdue treatment. */
+export function riskOverdue(risk: Risk, treatments: Treatment[]): boolean {
+  return treatmentsForRisk(treatments, risk.id).some(isOverdue);
+}
+
+/** Badge classes for a treatment / rollup status. */
 export function statusBadgeClass(status: string): string {
   if (status === 'Overdue') return 'bg-red-100 text-red-800';
   if (status === 'Completed') return 'bg-green-100 text-green-800';

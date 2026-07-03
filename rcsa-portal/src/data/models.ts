@@ -45,22 +45,41 @@ export interface Asset {
 
 export interface Risk {
   id: string;
-  assetId: string;
+  /** Assets this risk applies to (one risk can span several assets). */
+  assetIds: string[];
   threat: string;
   customThreat: boolean;
   vuln: string;
   owner: string;
   impact: Score5;
   likelihood: Score5;
-  resImpact: Score5;
-  resLikelihood: Score5;
+  /** Residual scoring is OPTIONAL — both set = assessed; both absent = not assessed. */
+  resImpact?: Score5;
+  resLikelihood?: Score5;
+  /** The risk decision. Concrete mitigation actions live in Treatment entities. */
   assessment: Assessment;
   controls: string[];
-  actionPlan: string;
-  responsible: string;
-  deadline: string;
-  treatmentStatus: TreatmentStatus;
+  /** Set when assessment is 'Accept' — the residual-risk acceptance expiry. */
   acceptanceExpiry: string;
+  evidence: string[];
+  comments: string[];
+  submittedAt: string;
+}
+
+/**
+ * A concrete action/project that treats one or more risks. Split out of Risk so
+ * the same treatment (e.g. "Deploy EDR") can address several risks and carry its
+ * own lifecycle. Chain: Asset → Risk → Treatment.
+ */
+export interface Treatment {
+  id: string;
+  /** The risk(s) this treatment addresses. */
+  riskIds: string[];
+  title: string;
+  description: string;
+  owner: string;
+  dueDate: string;
+  status: TreatmentStatus;
   evidence: string[];
   comments: string[];
   submittedAt: string;

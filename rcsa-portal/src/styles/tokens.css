@@ -1,23 +1,179 @@
-/* Design tokens — lifted verbatim from the prototype :root (New Version.html L26-33) */
+/* ════════════════════════════════════════════════════════════════
+   SentinelGRC design tokens — Light (default) + Dark.
+   Raw tokens (--bg, --surface, --accent, status colours, --sidebar*)
+   are used by the new shell & shared components. Legacy aliases below
+   them keep the existing RCSA markup re-skinning with no churn.
+   ════════════════════════════════════════════════════════════════ */
+
 :root {
-  --bg-main: #f5fbff;
-  --bg-card: #ffffff;
-  --bg-surface: #eef7ff;
-  --bg-surface-2: #eaf0ff;
-  --border: #c7d7ea;
-  --border-strong: #9db4d0;
-  --accent: #00b8d9;
-  --accent-soft: #d7f8ff;
-  --accent-2: #8b5cf6;
-  --accent-2-soft: #efe7ff;
-  --success: #16a34a;
-  --success-soft: #dcfce7;
-  --warning: #d97706;
-  --warning-soft: #fef3c7;
-  --critical: #dc2626;
-  --critical-soft: #fee2e2;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --blue: var(--accent);
-  --red: var(--critical);
+  color-scheme: light;
+  --font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* raw Sentinel tokens */
+  --bg: #eef2f1;
+  --surface: #ffffff;
+  --surface2: #f5f8f7;
+  --surface3: #eaf0ef;
+  --border: #e2e9e8;
+  --border-strong: #cfdad8;
+  --text: #0c1b1a;
+  --text2: #485957;
+  --text3: #7d8e8c;
+  --accent: #0d9488;
+  --accent-d: #0f766e;
+  --accent-soft: #d4f2ec;
+  --shadow: 0 1px 2px rgba(12, 27, 26, .06), 0 1px 3px rgba(12, 27, 26, .05);
+  --shadow-md: 0 4px 16px -4px rgba(12, 27, 26, .12);
+  --shadow-lg: 0 18px 40px -16px rgba(12, 27, 26, .28);
+
+  --sidebar: #0b1f1d;
+  --sidebar2: #0e2522;
+  --sidebar-text: #9db2af;
+  --sidebar-mut: #5f7572;
+  --sidebar-active: #2dd4bf;
+
+  --crit: #dc2626;  --high: #ea580c;  --med: #ca8a04;  --low: #16a34a;
+  --info: #0284c7;  --ok: #0d9488;    --mut: #64748b;   --purple: #7c3aed;
+  --crit-bg: #fbeaea; --high-bg: #fceee3; --med-bg: #fbf4dd; --low-bg: #e6f4ea;
+  --info-bg: #e2f0f9; --ok-bg: #d8f2ed;  --mut-bg: #eef1f4;  --purple-bg: #f1ebfb;
+
+  /* ── legacy aliases (consumed by index.css / RCSA markup) ── */
+  --page-bg: var(--bg);
+  --orb-display: none;
+
+  --card-bg: var(--surface);
+  --card-border: var(--border);
+  --card-shadow: var(--shadow);
+  --card-hover-shadow: var(--shadow-md);
+  --card-radius: 13px;
+  --card-blur: none;
+  --card-text: var(--text2);
+
+  --kpi-radius: 13px;
+  --kpi-shadow: var(--shadow);
+  --kpi-top-width: 0px;
+
+  --heading: var(--text);
+  --text-strong: var(--text);
+  --text-700: var(--text);
+  --text-600: var(--text2);
+  --text-500: var(--text3);
+  --text-400: var(--text3);
+  --body-text: var(--text2);
+
+  --link: var(--accent-d);
+  --c-success: var(--low);
+  --c-warning: var(--med);
+  --c-critical: var(--crit);
+  --c-blue: var(--info);
+  --c-purple: var(--purple);
+
+  --bg-green: var(--low-bg);
+  --bg-amber: var(--med-bg);
+  --bg-red: var(--crit-bg);
+  --bg-blue: var(--info-bg);
+  --bg-purple: var(--purple-bg);
+  --bg-gray: var(--mut-bg);
+  --badge-border: 1px solid transparent;
+  --inner-surface: var(--surface2);
+
+  --input-bg: var(--surface2);
+  --input-border: var(--border);
+  --input-text: var(--text);
+  --input-ph: var(--text3);
+  --focus-border: var(--accent);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
+
+  --btn-bg: var(--accent);
+  --btn-fg: #ffffff;
+  --btn-shadow: var(--shadow);
+  --btn-radius: 8px;
+  --neutral-bg: var(--surface2);
+  --neutral-fg: var(--text2);
+  --neutral-border: var(--border);
+  --danger-bg: var(--crit);
+  --danger-fg: #ffffff;
+
+  --thead-bg: var(--surface2);
+  --thead-text: var(--text3);
+  --row-hover: var(--surface2);
+  --divider: var(--border);
+  --table-text: var(--text2);
+  --active-row-bg: var(--accent-soft);
+  --active-row-border: var(--accent);
+  --border-soft: var(--border);
+
+  --side-bg: var(--sidebar);
+  --side-border: rgba(255, 255, 255, .07);
+  --side-shadow: none;
+  --side-blur: none;
+  --brand-sub: var(--sidebar-mut);
+  --navlabel: var(--sidebar-mut);
+  --navitem: var(--sidebar-text);
+  --navitem-hover-bg: rgba(255, 255, 255, .05);
+  --navitem-hover-fg: #ffffff;
+  --nav-active-bg: rgba(45, 212, 191, .12);
+  --nav-active-fg: var(--sidebar-active);
+  --nav-active-border: transparent;
+  --nav-radius: 9px;
+  --soon-bg: rgba(255, 255, 255, .04);
+  --soon-fg: var(--sidebar-mut);
+  --soon-border: rgba(255, 255, 255, .12);
+  --topbar-bg: var(--surface);
+  --topbar-border: var(--border);
+  --topbar-blur: none;
+
+  --backdrop: rgba(6, 16, 15, .5);
+  --backdrop-blur: blur(2px);
+  --panel-bg: var(--surface);
+  --panel-border: var(--border);
+  --panel-shadow: var(--shadow-lg);
+  --panel-radius: 16px;
+
+  --scroll-track: transparent;
+  --scroll-thumb: var(--border-strong);
+  --scroll-thumb-hover: var(--accent);
+
+  --gf-bg: var(--accent-soft);
+  --gf-border: 1px solid var(--accent);
+  --gf-clear-bg: var(--accent);
+  --gf-clear-fg: #ffffff;
+  --gf-dot: var(--accent);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #060d0c;
+  --surface: #0e1817;
+  --surface2: #121f1d;
+  --surface3: #172522;
+  --border: #1e2d2b;
+  --border-strong: #2b3e3b;
+  --text: #e9f1f0;
+  --text2: #9fb3b0;
+  --text3: #6c7e7c;
+  --accent: #2dd4bf;
+  --accent-d: #14b8a6;
+  --accent-soft: rgba(45, 212, 191, .14);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 6px 20px -6px rgba(0, 0, 0, .5);
+  --shadow-lg: 0 20px 44px -18px rgba(0, 0, 0, .7);
+
+  --sidebar: #08110f;
+  --sidebar2: #0c1816;
+  --sidebar-text: #8aa09d;
+  --sidebar-mut: #566b68;
+  --sidebar-active: #2dd4bf;
+
+  --crit: #f87171;  --high: #fb923c;  --med: #fbbf24;  --low: #4ade80;
+  --info: #38bdf8;  --ok: #2dd4bf;    --mut: #94a3b8;   --purple: #a78bfa;
+  --crit-bg: rgba(248, 113, 113, .14); --high-bg: rgba(251, 146, 60, .14);
+  --med-bg: rgba(251, 191, 36, .14);   --low-bg: rgba(74, 222, 128, .14);
+  --info-bg: rgba(56, 189, 248, .14);  --ok-bg: rgba(45, 212, 191, .14);
+  --mut-bg: rgba(148, 163, 184, .14);  --purple-bg: rgba(167, 139, 250, .16);
+
+  --link: var(--accent);
+  --btn-fg: #04211d;
 }

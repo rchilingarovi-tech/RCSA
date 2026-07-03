@@ -26,6 +26,7 @@ export function HeatmapModal() {
   const arr = getFilteredRisks({
     assets: store.assets,
     risks: store.risks,
+    treatments: store.treatments,
     selectedAssetId: store.selectedAssetId,
     globalFilter: store.globalFilter,
     assetFilters: store.assetFilters,

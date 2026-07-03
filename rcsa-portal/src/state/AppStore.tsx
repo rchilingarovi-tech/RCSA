@@ -7,7 +7,7 @@ import {
   useReducer,
   type ReactNode,
 } from 'react';
-import type { Asset, Risk } from '../data/models';
+import type { Asset, Risk, Treatment } from '../data/models';
 import { repo } from '../data';
 import {
   EMPTY_ASSET_FILTERS,
@@ -21,6 +21,7 @@ interface State {
   loaded: boolean;
   assets: Asset[];
   risks: Risk[];
+  treatments: Treatment[];
   selectedAssetId: string | null;
   globalFilter: GlobalFilter | null;
   assetFilters: AssetFilters;
@@ -28,13 +29,15 @@ interface State {
 }
 
 type Action =
-  | { kind: 'init'; assets: Asset[]; risks: Risk[] }
+  | { kind: 'init'; assets: Asset[]; risks: Risk[]; treatments: Treatment[] }
   | { kind: 'setAssets'; assets: Asset[] }
   | { kind: 'setRisks'; risks: Risk[] }
-  | { kind: 'setData'; assets: Asset[]; risks: Risk[] }
+  | { kind: 'setTreatments'; treatments: Treatment[] }
+  | { kind: 'setData'; assets: Asset[]; risks: Risk[]; treatments: Treatment[] }
   | { kind: 'selectAsset'; id: string }
   | { kind: 'setGlobalFilter'; filter: GlobalFilter }
   | { kind: 'clearGlobalFilter' }
+  | { kind: 'dismissGlobalFilter' }
   | { kind: 'clearSelection' }
   | { kind: 'patchAssetFilters'; patch: Partial<AssetFilters> }
   | { kind: 'clearAssetFilters' }
@@ -45,6 +48,7 @@ const initialState: State = {
   loaded: false,
   assets: [],
   risks: [],
+  treatments: [],
   selectedAssetId: null,
   globalFilter: null,
   assetFilters: { ...EMPTY_ASSET_FILTERS },
@@ -54,13 +58,15 @@ const initialState: State = {
 function reducer(state: State, action: Action): State {
   switch (action.kind) {
     case 'init':
-      return { ...state, loaded: true, assets: action.assets, risks: action.risks };
+      return { ...state, loaded: true, assets: action.assets, risks: action.risks, treatments: action.treatments };
     case 'setAssets':
       return { ...state, assets: action.assets };
     case 'setRisks':
       return { ...state, risks: action.risks };
+    case 'setTreatments':
+      return { ...state, treatments: action.treatments };
     case 'setData':
-      return { ...state, assets: action.assets, risks: action.risks };
+      return { ...state, assets: action.assets, risks: action.risks, treatments: action.treatments };
     case 'selectAsset':
       // selecting an asset clears the global filter and resets local risk filters
       return {
@@ -79,6 +85,9 @@ function reducer(state: State, action: Action): State {
         selectedAssetId: null,
         assetFilters: { ...EMPTY_ASSET_FILTERS },
       };
+    case 'dismissGlobalFilter':
+      // Remove only the chart facet, keep the slicer selections.
+      return { ...state, globalFilter: null };
     case 'clearSelection':
       return { ...state, selectedAssetId: null };
     case 'patchAssetFilters':
@@ -100,12 +109,19 @@ interface StoreApi extends State {
   deleteAsset(id: string): Promise<void>;
   saveRisk(risk: Risk): Promise<void>;
   deleteRisk(id: string): Promise<void>;
+  saveTreatment(treatment: Treatment): Promise<void>;
+  deleteTreatment(id: string): Promise<void>;
   resetDemoData(): Promise<void>;
+  // bulk upsert (spreadsheet import) — writes through the repo, reloads once
+  importAssets(assets: Asset[]): Promise<void>;
+  importRisks(risks: Risk[]): Promise<void>;
+  importTreatments(treatments: Treatment[]): Promise<void>;
   // navigation / filter ops
   selectAsset(id: string): void;
   clearSelection(): void;
   setGlobalFilter(filter: GlobalFilter): void;
   clearGlobalFilter(): void;
+  dismissGlobalFilter(): void;
   patchAssetFilters(patch: Partial<AssetFilters>): void;
   clearAssetFilters(): void;
   patchRiskFilters(patch: Partial<RiskFilters>): void;
@@ -118,17 +134,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([repo.listAssets(), repo.listRisks()]).then(([assets, risks]) => {
-      if (active) dispatch({ kind: 'init', assets, risks });
-    });
+    void Promise.all([repo.listAssets(), repo.listRisks(), repo.listTreatments()]).then(
+      ([assets, risks, treatments]) => {
+        if (active) dispatch({ kind: 'init', assets, risks, treatments });
+      },
+    );
     return () => {
       active = false;
     };
   }, []);
 
   const reload = useCallback(async () => {
-    const [assets, risks] = await Promise.all([repo.listAssets(), repo.listRisks()]);
-    dispatch({ kind: 'setData', assets, risks });
+    const [assets, risks, treatments] = await Promise.all([
+      repo.listAssets(),
+      repo.listRisks(),
+      repo.listTreatments(),
+    ]);
+    dispatch({ kind: 'setData', assets, risks, treatments });
   }, []);
 
   const saveAsset = useCallback(
@@ -151,12 +173,40 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const deleteRisk = useCallback(async (id: string) => {
     await repo.deleteRisk(id);
-    dispatch({ kind: 'setRisks', risks: await repo.listRisks() });
+    // deleting a risk can orphan treatments — refresh both.
+    const [risks, treatments] = await Promise.all([repo.listRisks(), repo.listTreatments()]);
+    dispatch({ kind: 'setRisks', risks });
+    dispatch({ kind: 'setTreatments', treatments });
+  }, []);
+
+  const saveTreatment = useCallback(async (treatment: Treatment) => {
+    await repo.saveTreatment(treatment);
+    dispatch({ kind: 'setTreatments', treatments: await repo.listTreatments() });
+  }, []);
+
+  const deleteTreatment = useCallback(async (id: string) => {
+    await repo.deleteTreatment(id);
+    dispatch({ kind: 'setTreatments', treatments: await repo.listTreatments() });
   }, []);
 
   const resetDemoData = useCallback(async () => {
-    const { assets, risks } = await repo.resetToSeed();
-    dispatch({ kind: 'setData', assets, risks });
+    const { assets, risks, treatments } = await repo.resetToSeed();
+    dispatch({ kind: 'setData', assets, risks, treatments });
+  }, []);
+
+  const importAssets = useCallback(async (assets: Asset[]) => {
+    for (const a of assets) await repo.saveAsset(a);
+    dispatch({ kind: 'setAssets', assets: await repo.listAssets() });
+  }, []);
+
+  const importRisks = useCallback(async (risks: Risk[]) => {
+    for (const r of risks) await repo.saveRisk(r);
+    dispatch({ kind: 'setRisks', risks: await repo.listRisks() });
+  }, []);
+
+  const importTreatments = useCallback(async (treatments: Treatment[]) => {
+    for (const t of treatments) await repo.saveTreatment(t);
+    dispatch({ kind: 'setTreatments', treatments: await repo.listTreatments() });
   }, []);
 
   const api = useMemo<StoreApi>(
@@ -166,16 +216,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       deleteAsset,
       saveRisk,
       deleteRisk,
+      saveTreatment,
+      deleteTreatment,
       resetDemoData,
+      importAssets,
+      importRisks,
+      importTreatments,
       selectAsset: (id) => dispatch({ kind: 'selectAsset', id }),
       clearSelection: () => dispatch({ kind: 'clearSelection' }),
       setGlobalFilter: (filter) => dispatch({ kind: 'setGlobalFilter', filter }),
       clearGlobalFilter: () => dispatch({ kind: 'clearGlobalFilter' }),
+      dismissGlobalFilter: () => dispatch({ kind: 'dismissGlobalFilter' }),
       patchAssetFilters: (patch) => dispatch({ kind: 'patchAssetFilters', patch }),
       clearAssetFilters: () => dispatch({ kind: 'clearAssetFilters' }),
       patchRiskFilters: (patch) => dispatch({ kind: 'patchRiskFilters', patch }),
     }),
-    [state, saveAsset, deleteAsset, saveRisk, deleteRisk, resetDemoData],
+    [state, saveAsset, deleteAsset, saveRisk, deleteRisk, saveTreatment, deleteTreatment, resetDemoData, importAssets, importRisks, importTreatments],
   );
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;

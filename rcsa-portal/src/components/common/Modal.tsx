@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -32,18 +33,27 @@ export function Modal({
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  // Scroll-lock + initial focus run once per open — NOT on every re-render.
+  // (Callers pass a fresh inline onClose each render; focusing here would steal
+  // focus from inputs on every keystroke.)
+  useEffect(() => {
+    if (!open) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     panelRef.current?.focus();
     return () => {
-      document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
-  return (
+  // Portal to <body> so the fixed overlay is never trapped by an ancestor with a
+  // containing block (transform / filter / backdrop-filter — e.g. .section-card).
+  return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center modal-bg z-50 p-4"
       onClick={(e) => {
@@ -81,6 +91,7 @@ export function Modal({
         {headerExtra}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

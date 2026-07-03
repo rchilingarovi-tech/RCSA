@@ -1,20 +1,26 @@
 import { useMemo } from 'react';
 import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
+import { usePermissions } from '../../auth/usePermissions';
 import { Badge } from '../common/Badge';
-import { AssetFilters } from './AssetFilters';
+import { Pagination, usePaged } from '../common/Pagination';
 import { assetValue, criticality } from '../../domain/scoring';
 import { getFilteredAssets } from '../../state/filters';
+import type { Asset } from '../../data/models';
 
-export function AssetTable() {
+// `assets` override lets the Dashboard feed its own scoped set; without it the
+// table filters by the page's own asset filters.
+export function AssetTable({ assets: override }: { assets?: Asset[] } = {}) {
   const store = useStore();
   const modals = useModals();
+  const perms = usePermissions('asset-catalogue');
 
-  const filtered = useMemo(
+  const computed = useMemo(
     () =>
       getFilteredAssets({
         assets: store.assets,
         risks: store.risks,
+        treatments: store.treatments,
         selectedAssetId: store.selectedAssetId,
         globalFilter: store.globalFilter,
         assetFilters: store.assetFilters,
@@ -22,20 +28,22 @@ export function AssetTable() {
       }),
     [store.assets, store.risks, store.selectedAssetId, store.globalFilter, store.assetFilters, store.riskFilters],
   );
+  const filtered = override ?? computed;
+  const pager = usePaged(filtered);
 
   const riskCount = useMemo(() => {
     const counts = new Map<string, number>();
-    store.risks.forEach((r) => counts.set(r.assetId, (counts.get(r.assetId) || 0) + 1));
+    store.risks.forEach((r) => r.assetIds.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1)));
     return counts;
   }, [store.risks]);
 
   return (
     <div className="section-card">
-      <div className="px-5 py-4 border-b bg-gray-50">
-        <div className="flex flex-col gap-3">
-          <h2 className="text-base font-semibold text-gray-800">1. Asset Catalog</h2>
-          <AssetFilters />
-        </div>
+      <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-gray-800">1. Asset Catalog</h2>
+        <span className="text-xs text-gray-500">
+          {filtered.length} asset{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
@@ -57,7 +65,7 @@ export function AssetTable() {
                 <td colSpan={8} className="px-4 py-6 text-center text-gray-400">No assets match current filters.</td>
               </tr>
             ) : (
-              filtered.map((a) => {
+              pager.pageItems.map((a) => {
                 const v = assetValue(a);
                 const [cl, cc] = criticality(v);
                 const rc = riskCount.get(a.id) || 0;
@@ -94,8 +102,9 @@ export function AssetTable() {
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2">
-                        <button onClick={() => modals.editAsset(a.id)} className="text-blue-600 text-xs hover:underline">Edit</button>
-                        <button onClick={() => modals.deleteAssetFlow(a.id)} className="text-red-500 text-xs hover:underline">Delete</button>
+                        {perms.edit && <button onClick={() => modals.editAsset(a.id)} className="text-blue-600 text-xs hover:underline">Edit</button>}
+                        {perms.remove && <button onClick={() => modals.deleteAssetFlow(a.id)} className="text-red-500 text-xs hover:underline">Delete</button>}
+                        {!perms.edit && !perms.remove && <span className="text-xs" style={{ color: 'var(--text3)' }}>—</span>}
                       </div>
                     </td>
                   </tr>
@@ -105,6 +114,15 @@ export function AssetTable() {
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        pageSize={pager.pageSize}
+        total={pager.total}
+        start={pager.start}
+        onPage={pager.setPage}
+        onPageSize={pager.setPageSize}
+      />
     </div>
   );
 }

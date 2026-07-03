@@ -1,0 +1,119 @@
+@import './styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════════════════════════
+   Dark Dashboard Theme — dark navy page + chrome, light content cards,
+   teal accent, flat cards with subtle elevation.
+   Revert to the previous look by restoring *.cyber.css.bak.
+   ════════════════════════════════════════════════════════════════ */
+
+html { background: var(--bg-main); }
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── component scaffolding ── */
+.modal-bg { background: rgba(10, 15, 30, 0.6) !important; backdrop-filter: blur(8px); }
+.badge { padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; display: inline-block; border: 1px solid rgba(148, 163, 184, 0.25); }
+.tab-btn { padding: 0.4rem 1rem; border-bottom: 2px solid transparent; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); transition: all 0.15s; }
+.tab-btn.active { border-color: var(--accent); color: var(--accent); }
+.modal-back-btn { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid var(--border); background: #fff; color: var(--text-main); padding: 0.35rem 0.7rem; border-radius: 0.55rem; font-size: 0.78rem; font-weight: 700; }
+.modal-back-btn:hover { filter: brightness(0.98); }
+.heat-cell { width: 52px; height: 42px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; cursor: default; }
+.comment-bubble { background: #f1f5f9; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; }
+
+/* ── cards: flat, light, subtle elevation ── */
+.section-card, .dashboard-card, .chart-container, .empty-risk-message, .asset-detail,
+.modal-panel {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-main) !important;
+  backdrop-filter: none !important;
+}
+.section-card, .chart-container, .dashboard-card { border-radius: 12px; }
+.section-card:hover, .dashboard-card:hover, .chart-container:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* ── inner subtle surfaces & borders ── */
+.bg-gray-50, .bg-gray-100, .bg-white, .bg-orange-50, .bg-green-50, .bg-blue-50 { background-color: #f4f5f7 !important; }
+.border, .border-b, .border-t, .border-blue-100, .border-blue-200, .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+.text-gray-800, .text-gray-700, .text-gray-600, .text-blue-700, .text-blue-800, .text-blue-600 { color: var(--text-main) !important; }
+.text-gray-500, .text-gray-400 { color: var(--text-muted) !important; }
+.text-orange-800 { color: var(--warning) !important; }
+.text-green-800 { color: var(--success) !important; }
+
+/* ── headings ── */
+h1, h2, h3, h4 { color: var(--text-main) !important; letter-spacing: -0.02em; }
+h1 { font-weight: 800; background: linear-gradient(90deg, #111827, var(--accent) 85%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+.selected-asset-name, .global-filter-banner-text { color: var(--accent) !important; font-weight: bold; }
+
+/* ── tables ── */
+table { color: var(--text-main); }
+thead, thead.bg-gray-100 { background: var(--bg-surface) !important; color: var(--text-muted) !important; }
+tbody tr { border-color: var(--border) !important; }
+.asset-row:hover, .risk-row:hover { background: #f3f4f6 !important; cursor: pointer; }
+.active-row { background: #ecfdfa !important; border-left: 4px solid var(--accent) !important; }
+
+/* ── inputs ── */
+input, select, textarea { background: #fff !important; border-color: var(--border) !important; color: var(--text-main) !important; caret-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: rgba(107, 114, 128, 0.7) !important; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent) !important; outline-offset: 1px; box-shadow: 0 0 0 3px rgba(0, 201, 177, 0.15) !important; }
+option { background: #fff; color: var(--text-main); }
+
+/* ── buttons: flat teal primary ── */
+button { transition: all 0.15s ease; }
+button.bg-blue-600, button[type='submit'] { background: var(--accent) !important; color: #04201c !important; border: 0 !important; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important; }
+button.bg-red-600, #confirm-ok { background: var(--critical) !important; color: #fff !important; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important; }
+button.btn-neutral { background: #fff !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; box-shadow: none !important; }
+button:hover { filter: brightness(1.04); }
+
+/* ── badge / tag palette ── */
+.bg-green-100 { background: var(--success-soft) !important; }
+.text-green-700, .text-green-800 { color: var(--success) !important; }
+.bg-yellow-100, .bg-orange-100 { background: var(--warning-soft) !important; }
+.text-yellow-800, .text-orange-600, .text-orange-800 { color: var(--warning) !important; }
+.bg-red-100 { background: var(--critical-soft) !important; }
+.text-red-500, .text-red-600, .text-red-700, .text-red-800 { color: var(--critical) !important; }
+.bg-blue-100, .bg-sky-100 { background: var(--blue-soft) !important; }
+.text-sky-800 { color: var(--blue) !important; }
+.bg-purple-100 { background: var(--accent-2-soft) !important; }
+.text-purple-800 { color: var(--accent-2) !important; }
+.bg-gray-100, .bg-gray-200 { background: #eceef1 !important; }
+
+/* ── misc surfaces ── */
+.sticky-head { background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(8px); }
+.chart-container { padding: 1rem; height: 260px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+.chart-overlay { position: absolute; inset: 0; border-radius: 12px; transition: background 0.2s; pointer-events: none; }
+.chart-container:hover .chart-overlay { background: rgba(0, 201, 177, 0.04); }
+.global-filter-banner { background: #ecfdfa; border: 1px solid var(--accent); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+
+/* ════════════════════════════════════════════════════════════════
+   App chrome — dark sidebar + top bar (light content sits beside it).
+   Uses scoped classes so the global light-card overrides above don't
+   bleed onto the dark chrome.
+   ════════════════════════════════════════════════════════════════ */
+.app-sidebar { background: var(--bg-chrome); color: var(--text-main); border-right: 1px solid var(--border); }
+.app-sidebar .border-b { border-color: var(--border) !important; }
+.app-sidebar .brand { color: var(--text-main); font-weight: 800; }
+.app-sidebar .brand-sub { color: var(--text-muted); }
+.app-sidebar .nav-group-label { color: #9ca3af; }
+.app-sidebar .nav-item { color: #4b5563; transition: all 0.15s; }
+.app-sidebar .nav-item:hover { background: #f3f4f6; color: var(--text-main); }
+.app-sidebar .nav-item.is-active { background: var(--accent-soft); color: #0f766e; box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+.app-sidebar .soon-tag { background: #eceef1; color: #9ca3af; }
+.app-topbar { background: var(--bg-chrome); color: var(--text-main); border-bottom: 1px solid var(--border); }
+
+/* ── performance + accessibility ── */
+.section-card, .chart-container { content-visibility: auto; contain-intrinsic-size: 1px 320px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+  button:hover { filter: none !important; }
+}
