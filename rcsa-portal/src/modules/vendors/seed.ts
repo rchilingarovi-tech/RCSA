@@ -1,47 +1,14 @@
-import type { Criticality, Vendor, VendorStatus } from './types';
+import type { Vendor } from './types';
 
-// Deterministic demo data (sanitized/fake). Dates are relative to "now" so the
-// renewal / expired states stay realistic regardless of when the demo is opened.
+// Deterministic demo data (sanitized/fake). Contract dates are relative to "now"
+// so the expired / renewal states stay realistic whenever the demo is opened.
 const iso = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
-type Row = [
-  string, string, string, Criticality, boolean, number,
-  number, number, VendorStatus, string[], string, string, string, string,
+export const SEED_VENDORS: Vendor[] = [
+  { id: 'VEN-01', name: 'CorePro Banking Ltd', criticality: 'Critical', dataAccess: 'Restricted', score: 22, contractExpiry: iso(300), certs: ['ISO 27001', 'SOC 2'] },
+  { id: 'VEN-02', name: 'CardFlow Processing', criticality: 'Critical', dataAccess: 'Restricted', score: 41, contractExpiry: iso(45), certs: ['PCI-DSS', 'ISO 27001'] },
+  { id: 'VEN-03', name: 'CloudMail SaaS', criticality: 'High', dataAccess: 'Confidential', score: 35, contractExpiry: iso(180), certs: ['SOC 2'] },
+  { id: 'VEN-04', name: 'SecureShred Services', criticality: 'Low', dataAccess: 'Internal', score: 58, contractExpiry: iso(-20), certs: [] },
+  { id: 'VEN-05', name: 'NetGuard MSSP', criticality: 'High', dataAccess: 'Confidential', score: 18, contractExpiry: iso(240), certs: ['ISO 27001', 'SOC 2'] },
+  { id: 'VEN-06', name: 'FacilityPlus Cleaning', criticality: 'Low', dataAccess: 'None', score: 71, contractExpiry: iso(120), certs: [] },
 ];
-
-const ROWS: Row[] = [
-  ['VEN-01', 'Amazon Web Services', 'Cloud Infrastructure', 'Critical', true, 18, 280, -135, 'Active', ['ISO 27001', 'SOC 2 Type II', 'PCI-DSS'], '4 hrs', 'Passed (latest cycle)', 'Tested annually', 'Encrypted at rest & transit; EU region'],
-  ['VEN-02', 'Microsoft 365', 'Productivity Suite', 'Critical', true, 22, 95, -160, 'Active', ['ISO 27001', 'SOC 2 Type II'], '8 hrs', 'Passed (latest cycle)', 'Documented', 'Encrypted; data residency configurable'],
-  ['VEN-03', 'Temenos (Core Banking)', 'Banking Software', 'Critical', true, 38, 40, -230, 'Active', ['ISO 27001'], '24 hrs', 'Remediation pending', 'Partial', 'On-prem + hosted; CHD in scope'],
-  ['VEN-04', 'Cloudflare', 'Network Security', 'High', false, 16, 200, -110, 'Active', ['ISO 27001', 'SOC 2 Type II'], '2 hrs', 'Passed (latest cycle)', 'Tested', 'No customer data stored'],
-  ['VEN-05', 'Visa / Mastercard Gateway', 'Payment Processing', 'Critical', true, 28, 370, -130, 'Active', ['PCI-DSS Level 1'], '4 hrs', 'Passed (latest cycle)', 'Tested annually', 'Tokenized cardholder data'],
-  ['VEN-06', 'Salesforce', 'CRM', 'Medium', true, 31, 70, -260, 'Active', ['ISO 27001', 'SOC 2 Type II'], '12 hrs', 'Passed (latest cycle)', 'Documented', 'Customer & sales PII'],
-  ['VEN-07', 'LocalTech Managed Services', 'Managed IT', 'Medium', true, 52, 25, -200, 'Active', ['ISO 27001 (in progress)'], '48 hrs', 'Not provided', 'Not documented', 'Privileged access to systems'],
-  ['VEN-08', 'Iron Mountain', 'Records Storage', 'Low', false, 20, 240, -150, 'Active', ['ISO 27001'], '72 hrs', 'N/A', 'Documented', 'Physical records only'],
-  ['VEN-09', 'SendGrid', 'Email Delivery', 'Medium', true, 27, 110, -240, 'Active', ['SOC 2 Type II'], '8 hrs', 'Passed (latest cycle)', 'Documented', 'Email metadata & content'],
-  ['VEN-10', 'PrintWorks Ltd.', 'Document Printing', 'Low', false, 58, -10, -315, 'Offboarded', [], 'No SLA', 'Not provided', 'Not documented', 'Printed documents (PII)'],
-];
-
-export const SEED_VENDORS: Vendor[] = ROWS.map((r) => {
-  const assessed = iso(r[7]);
-  return {
-    id: r[0],
-    name: r[1],
-    category: r[2],
-    criticality: r[3],
-    dataAccess: r[4],
-    score: r[5],
-    expiry: iso(r[6]),
-    assessed,
-    status: r[8],
-    certs: r[9],
-    sla: r[10],
-    pentest: r[11],
-    bcp: r[12],
-    dataNote: r[13],
-    history: [
-      { date: assessed, note: 'Annual security assessment completed' },
-      { date: iso(r[7] - 200), note: 'Initial onboarding review' },
-    ],
-  };
-});

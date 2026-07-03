@@ -1,47 +1,35 @@
 // Third-Party Vendors — standalone module (not linked to RCSA). Own model + storage.
+// Model ported from the SentinelGRC reference.
 
 export const CRITICALITIES = ['Critical', 'High', 'Medium', 'Low'] as const;
 export type Criticality = (typeof CRITICALITIES)[number];
 
-export const VENDOR_STATUSES = ['Active', 'Offboarded'] as const;
-export type VendorStatus = (typeof VENDOR_STATUSES)[number];
+export const DATA_ACCESS = ['None', 'Internal', 'Confidential', 'Restricted'] as const;
+export type DataAccess = (typeof DATA_ACCESS)[number];
 
-export interface AssessmentEntry {
-  date: string;
-  note: string;
-}
+export const CERT_OPTIONS = ['ISO 27001', 'SOC 2', 'PCI-DSS'] as const;
 
 export interface Vendor {
-  id: string; // VEN-###
+  id: string; // VEN-##
   name: string;
-  category: string;
   criticality: Criticality;
-  dataAccess: boolean;
-  score: number; // residual risk score 0–100 (higher = riskier)
-  expiry: string; // contract expiry YYYY-MM-DD
-  assessed: string; // last assessed YYYY-MM-DD
-  status: VendorStatus;
+  dataAccess: DataAccess;
+  score: number; // residual risk 0–100 (lower is better)
+  contractExpiry: string; // YYYY-MM-DD
   certs: string[];
-  sla: string;
-  pentest: string;
-  bcp: string;
-  dataNote: string;
-  history: AssessmentEntry[];
 }
 
-/** Risk band from score. k maps to a status colour token (low/med/high/crit). */
-export function band(score: number): { label: string; k: string } {
-  if (score <= 25) return { label: 'Low', k: 'low' };
-  if (score <= 45) return { label: 'Medium', k: 'med' };
-  if (score <= 70) return { label: 'High', k: 'high' };
-  return { label: 'Critical', k: 'crit' };
+/** Residual-score band (lower is better). `k` is a status colour token. */
+export function scoreBand(score: number): { label: string; k: string } {
+  if (score >= 60) return { label: 'Severe', k: 'crit' };
+  if (score >= 40) return { label: 'Elevated', k: 'high' };
+  if (score >= 25) return { label: 'Moderate', k: 'med' };
+  return { label: 'Healthy', k: 'low' };
 }
 
-export function criticalityColor(c: Criticality): string {
-  return c === 'Critical' ? 'crit' : c === 'High' ? 'high' : c === 'Medium' ? 'med' : 'low';
-}
-
-/** Days until contract expiry (negative = already expired). */
-export function daysLeft(expiry: string): number {
-  return Math.round((new Date(expiry).getTime() - Date.now()) / 86400000);
-}
+export const criticalityToken: Record<Criticality, string> = {
+  Critical: 'crit',
+  High: 'high',
+  Medium: 'med',
+  Low: 'low',
+};
