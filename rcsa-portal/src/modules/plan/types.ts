@@ -1,26 +1,23 @@
 // Yearly Plan — standalone module. Own model + storage.
+// Model ported from the SentinelGRC reference.
 
-export const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const;
+export const PRIORITIES = ['High', 'Medium', 'Low'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
-export const PLAN_STATUSES = ['Planned', 'In Progress', 'Completed', 'Cancelled'] as const;
-export type PlanStatus = (typeof PLAN_STATUSES)[number];
+export const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+export type Quarter = (typeof QUARTERS)[number];
+
+export const CATEGORIES = ['Identity & Access', 'Security Operations', 'Compliance', 'Third-Party Risk', 'Infrastructure', 'Resilience', 'People'] as const;
+export type PlanCategory = (typeof CATEGORIES)[number];
 
 export interface Initiative {
-  id: string; // INI-###
-  name: string;
-  category: string;
-  quarter: string; // e.g. "Q1–Q3"
+  id: string; // INI-##
+  initiative: string;
+  category: PlanCategory;
+  quarter: Quarter;
   owner: string;
   priority: Priority;
-  status: PlanStatus;
   progress: number; // 0–100
 }
 
-export function priorityColor(p: Priority): string {
-  return p === 'Critical' ? 'crit' : p === 'High' ? 'high' : p === 'Medium' ? 'med' : 'low';
-}
-
-export function statusColor(s: PlanStatus): string {
-  return s === 'Completed' ? 'low' : s === 'In Progress' ? 'info' : s === 'Planned' ? 'med' : 'mut';
-}
+export const priorityToken: Record<Priority, string> = { High: 'crit', Medium: 'med', Low: 'mut' };

@@ -1,26 +1,12 @@
-import type { Initiative, PlanStatus, Priority } from './types';
+import type { Initiative } from './types';
 
-// Deterministic demo data (sanitized/fake).
-type Row = [string, string, string, string, string, Priority, PlanStatus, number];
-
-const ROWS: Row[] = [
-  ['INI-01', 'Zero Trust Network Rollout', 'Security Architecture', 'Q1–Q3', 'Tamar Kvirikashvili', 'High', 'In Progress', 55],
-  ['INI-02', 'ISO 27001 Recertification', 'Compliance', 'Q2–Q4', 'Nino Gelashvili', 'Critical', 'In Progress', 40],
-  ['INI-03', 'SOC / SIEM Deployment', 'Detection', 'Q2–Q3', 'Tamar Kvirikashvili', 'High', 'In Progress', 30],
-  ['INI-04', 'PAM Implementation', 'Identity', 'Q3', 'Giorgi Beridze', 'High', 'Planned', 0],
-  ['INI-05', 'Security Awareness Refresh', 'Awareness', 'Q1–Q4', 'Nino Gelashvili', 'Medium', 'In Progress', 60],
-  ['INI-06', 'Third-Party Risk Program', 'GRC', 'Q2–Q4', 'Tamar Kvirikashvili', 'Medium', 'In Progress', 25],
-  ['INI-07', 'DLP Expansion', 'Data Protection', 'Q3–Q4', 'Salome Tsiklauri', 'Medium', 'Planned', 0],
-  ['INI-08', 'Legacy System Decommission', 'Infrastructure', 'Q1–Q2', 'Tamar Kvirikashvili', 'High', 'In Progress', 70],
+export const SEED_INITIATIVES: Initiative[] = [
+  { id: 'INI-01', initiative: 'Persona-based access migration (P1–P3)', category: 'Identity & Access', quarter: 'Q3', owner: 'CISO', priority: 'High', progress: 46 },
+  { id: 'INI-02', initiative: 'Legacy AD group decommission', category: 'Identity & Access', quarter: 'Q4', owner: 'Identity Team', priority: 'High', progress: 10 },
+  { id: 'INI-03', initiative: 'SIEM detection engineering uplift', category: 'Security Operations', quarter: 'Q2', owner: 'SecOps', priority: 'High', progress: 70 },
+  { id: 'INI-04', initiative: 'Third-party risk tiering refresh', category: 'Third-Party Risk', quarter: 'Q3', owner: 'Vendor Mgmt', priority: 'Medium', progress: 25 },
+  { id: 'INI-05', initiative: 'DORA readiness assessment', category: 'Compliance', quarter: 'Q3', owner: 'InfoSec', priority: 'High', progress: 35 },
+  { id: 'INI-06', initiative: 'Branch endpoint hardening baseline', category: 'Infrastructure', quarter: 'Q2', owner: 'Branch IT', priority: 'Medium', progress: 80 },
+  { id: 'INI-07', initiative: 'Tabletop exercise — ransomware', category: 'Resilience', quarter: 'Q4', owner: 'SecOps', priority: 'Medium', progress: 0 },
+  { id: 'INI-08', initiative: 'Security awareness refresh 2026', category: 'People', quarter: 'Q1', owner: 'InfoSec', priority: 'Low', progress: 100 },
 ];
-
-export const SEED_INITIATIVES: Initiative[] = ROWS.map((r) => ({
-  id: r[0],
-  name: r[1],
-  category: r[2],
-  quarter: r[3],
-  owner: r[4],
-  priority: r[5],
-  status: r[6],
-  progress: r[7],
-}));
