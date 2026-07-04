@@ -9,6 +9,7 @@ import { reviewDue } from '../../modules/policies/types';
 import { accessRepo } from '../../modules/access/repo';
 import { overdue as accessOverdue } from '../../modules/access/types';
 import { awarenessRepo } from '../../modules/awareness/repo';
+import { overdue as awarenessOverdue } from '../../modules/awareness/types';
 import { kpiRepo } from '../../modules/kpis/repo';
 import { rag } from '../../modules/kpis/types';
 
@@ -44,7 +45,7 @@ export function buildNotifications(treatments: Treatment[]): AppNotification[] {
   const accessLate = accessRepo.list().filter(accessOverdue).length;
   if (accessLate) out.push({ id: 'acr-overdue', moduleId: 'access-reviews', icon: 'key', k: 'crit', title: 'Access reviews overdue', body: `${plural(accessLate, 'campaign')} past due.` });
 
-  const trainingLate = awarenessRepo.list().filter((c) => c.status === 'Overdue').length;
+  const trainingLate = awarenessRepo.list().filter(awarenessOverdue).length;
   if (trainingLate) out.push({ id: 'trn-overdue', moduleId: 'awareness', icon: 'grad', k: 'crit', title: 'Training overdue', body: `${plural(trainingLate, 'course')} past their deadline.` });
 
   const kpisOff = kpiRepo.list().filter((kp) => rag(kp) === 'crit').length;
