@@ -1,18 +1,17 @@
 // Committee Meetings — standalone module. Own model + storage.
+// Model ported from the SentinelGRC reference.
 
-export const MEETING_STATUSES = ['Scheduled', 'Completed', 'Cancelled'] as const;
+export const MEETING_STATUSES = ['Scheduled', 'Held', 'Minutes Issued'] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 
 export interface Meeting {
-  id: string; // MTG-###
+  id: string; // MTG-##
   title: string;
   date: string; // YYYY-MM-DD
-  attendees: number;
+  attendance: string;
+  decisions: string;
   openActions: number;
   status: MeetingStatus;
-  notes: string; // minutes / decisions summary
 }
 
-export function statusColor(s: MeetingStatus): string {
-  return s === 'Completed' ? 'low' : s === 'Scheduled' ? 'info' : 'mut';
-}
+export const statusToken: Record<MeetingStatus, string> = { Scheduled: 'info', Held: 'med', 'Minutes Issued': 'low' };

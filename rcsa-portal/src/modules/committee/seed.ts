@@ -1,24 +1,11 @@
-import type { Meeting, MeetingStatus } from './types';
+import type { Meeting } from './types';
 
-// Deterministic demo data (sanitized/fake). Dates relative to "now".
 const iso = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
-type Row = [string, string, number, number, number, MeetingStatus, string];
-
-const ROWS: Row[] = [
-  ['MTG-01', 'Security Steering Committee — Q2', -28, 9, 3, 'Completed', 'Reviewed risk posture, approved treatment budget, ratified updated IS policy.'],
-  ['MTG-02', 'Monthly Risk Review — current period', -14, 6, 5, 'Completed', 'Walked through open high/critical risks; assigned owners to overdue treatments.'],
-  ['MTG-03', 'Security Steering Committee — Q1', -100, 9, 1, 'Completed', 'Annual programme kick-off; endorsed ISO 27001 recertification plan.'],
-  ['MTG-04', 'Monthly Risk Review — upcoming', 12, 6, 4, 'Scheduled', 'Agenda: vendor renewals, access-review status, KPI scorecard.'],
-  ['MTG-05', 'Incident Post-Mortem — Phishing', -50, 5, 2, 'Completed', 'Root-cause and lessons learned; awareness wave scheduled.'],
+export const SEED_MEETINGS: Meeting[] = [
+  { id: 'MTG-01', title: 'InfoSec Steering Committee — Q2', date: iso(-20), attendance: 'CISO, CIO, CRO, Heads of IT/Ops', decisions: 'Approved next-phase budget; accepted vendor risk R7 for 60 days', openActions: 2, status: 'Minutes Issued' },
+  { id: 'MTG-02', title: 'Risk Committee — monthly', date: iso(-8), attendance: 'CRO, CISO, Internal Audit', decisions: 'Residual review of ransomware risk; escalation threshold updated', openActions: 3, status: 'Minutes Issued' },
+  { id: 'MTG-03', title: 'Security Working Group #14', date: iso(-3), attendance: 'Identity Team, InfoSec, Branch IT', decisions: 'Persona shadow-mode results reviewed', openActions: 5, status: 'Held' },
+  { id: 'MTG-04', title: 'InfoSec Steering Committee — Q3', date: iso(25), attendance: '', decisions: '', openActions: 0, status: 'Scheduled' },
+  { id: 'MTG-05', title: 'Incident post-mortem — INC-003', date: iso(4), attendance: '', decisions: '', openActions: 0, status: 'Scheduled' },
 ];
-
-export const SEED_MEETINGS: Meeting[] = ROWS.map((r) => ({
-  id: r[0],
-  title: r[1],
-  date: iso(r[2]),
-  attendees: r[3],
-  openActions: r[4],
-  status: r[5],
-  notes: r[6],
-}));
