@@ -1,44 +1,52 @@
-// Department KPIs — standalone module (not linked to RCSA). Own model + storage.
+// Department KPIs — standalone module. Own model + storage.
+// Model ported from the SentinelGRC reference (direction-aware RAG + string history).
 
-export const FREQUENCIES = ['Monthly', 'Quarterly', 'Annual'] as const;
-export type Frequency = (typeof FREQUENCIES)[number];
+export const DIRECTIONS = ['Higher is better', 'Lower is better'] as const;
+export type Direction = (typeof DIRECTIONS)[number];
 
 export interface Kpi {
-  id: string; // KPI-###
+  id: string; // KPI-##
   name: string;
-  category: string;
   target: number;
   current: number;
   unit: string;
-  frequency: Frequency;
-  owner: string;
-  lowerBetter: boolean; // true when a lower value is better (e.g. MTTD)
-  history: number[]; // oldest → newest, for the sparkline
+  direction: Direction;
+  history: string; // comma-separated values, oldest → newest (real history only)
 }
 
 export type Rag = 'low' | 'med' | 'crit';
 
-/** RAG status, honouring whether lower is better. low=On Track, med=At Risk, crit=Off Track. */
-export function rag(k: Pick<Kpi, 'current' | 'target' | 'lowerBetter'>): Rag {
-  if (k.lowerBetter) {
-    if (k.current <= k.target) return 'low';
-    if (k.current <= k.target * 1.25 || k.current <= k.target + 2) return 'med';
+/** Direction-aware RAG. low = On Track, med = At Risk, crit = Off Track. */
+export function rag(k: Pick<Kpi, 'current' | 'target' | 'direction'>): Rag {
+  const c = k.current;
+  const t = k.target;
+  if (k.direction === 'Higher is better') {
+    if (c >= t) return 'low';
+    if (c >= t * 0.9) return 'med';
     return 'crit';
   }
-  if (k.current >= k.target) return 'low';
-  if (k.current >= k.target * 0.9) return 'med';
+  if (c <= t) return 'low';
+  if (c <= t * 1.25) return 'med';
   return 'crit';
 }
 
-export function ragWord(r: Rag): string {
+export function ragLabel(r: Rag): string {
   return r === 'low' ? 'On Track' : r === 'med' ? 'At Risk' : 'Off Track';
 }
 
-export const ragColor = (r: Rag) => `var(--${r})`;
+/** Parse the stored history string into numbers (real values only). */
+export function parseHistory(h: string): number[] {
+  return String(h || '')
+    .split(',')
+    .map((x) => Number(x.trim()))
+    .filter((n) => Number.isFinite(n));
+}
 
-/** Whether the latest trend is an improvement, given the metric direction. */
-export function improving(k: Kpi): boolean {
-  if (k.history.length < 2) return true;
-  const up = k.history[k.history.length - 1] >= k.history[0];
-  return k.lowerBetter ? !up : up;
+/** Attainment vs target as a 0–100 %, direction-aware. */
+export function attainment(k: Pick<Kpi, 'current' | 'target' | 'direction'>): number {
+  const c = k.current;
+  const t = k.target;
+  if (!t) return c === 0 ? 100 : 0;
+  const raw = k.direction === 'Higher is better' ? c / t : c <= t ? 1 : t / Math.max(c, 1e-6);
+  return Math.max(0, Math.min(100, Math.round(raw * 100)));
 }
