@@ -18,7 +18,6 @@ const fmtDateTime = (s: string) => {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { year: '2-digit', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 };
-const fmtDate = (s: string) => (s ? new Date(s).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: '2-digit' }) : '—');
 
 interface Props {
   incidents: Incident[]; // already filtered by the page-level slicer
@@ -48,8 +47,8 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
 
   const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
   const caret = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const sortable = (key: SortKey, label: string) => (
-    <th className={`${th} cursor-pointer select-none`} onClick={() => toggleSort(key)}>{label}{caret(key)}</th>
+  const sortable = (key: SortKey, label: string, extra = '') => (
+    <th className={`${th} cursor-pointer select-none ${extra}`} onClick={() => toggleSort(key)}>{label}{caret(key)}</th>
   );
 
   return (
@@ -65,35 +64,25 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
             <tr>
               {sortable('id', 'ID')}
               <th className={th}>Short Description</th>
-              {sortable('reportedAt', 'Time Reported')}
-              <th className={th}>Incident Time</th>
-              <th className={th}>Reported By</th>
-              <th className={th}>Category</th>
+              <th className={`${th} hidden sm:table-cell`}>Category</th>
+              {sortable('reportedAt', 'Time Reported', 'hidden md:table-cell')}
               {sortable('severity', 'Severity')}
-              <th className={th}>Asset</th>
               {sortable('status', 'Status')}
-              <th className={th}>Responsible</th>
-              <th className={th}>Closure</th>
               <th className={th}>Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pager.pageItems.length === 0 ? (
-              <tr><td colSpan={12} className="px-4 py-6 text-center text-gray-400">No incidents match the filters.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No incidents match the filters.</td></tr>
             ) : (
               pager.pageItems.map((i) => (
                 <tr key={i.id} className="risk-row cursor-pointer" onClick={() => onView(i)}>
                   <td className="px-3 py-3 font-mono text-xs text-gray-600 font-semibold whitespace-nowrap">{i.id}</td>
-                  <td className="px-3 py-3 font-medium text-gray-800 max-w-[240px] truncate" title={i.shortDesc}>{i.shortDesc}</td>
-                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDateTime(i.reportedAt)}</td>
-                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDateTime(i.occurredAt)}</td>
-                  <td className="px-3 py-3 text-sm whitespace-nowrap">{i.reportedBy}</td>
-                  <td className="px-3 py-3 text-sm max-w-[160px] truncate" title={categoryLabel(i)}>{categoryLabel(i)}</td>
+                  <td className="px-3 py-3 font-medium text-gray-800 max-w-[220px] sm:max-w-[340px] truncate" title={i.shortDesc}>{i.shortDesc}</td>
+                  <td className="px-3 py-3 text-sm max-w-[160px] truncate hidden sm:table-cell" title={categoryLabel(i)}>{categoryLabel(i)}</td>
+                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap hidden md:table-cell">{fmtDateTime(i.reportedAt)}</td>
                   <td className="px-3 py-3"><Pill text={i.severity} k={severityColor(i.severity)} /></td>
-                  <td className="px-3 py-3 text-sm whitespace-nowrap">{i.asset}</td>
                   <td className="px-3 py-3"><Pill text={i.status} k={statusColor(i.status)} /></td>
-                  <td className="px-3 py-3 text-sm whitespace-nowrap">{i.responsible || 'Unassigned'}</td>
-                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(i.closedAt)}</td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2 text-xs">
                       <button onClick={() => onView(i)} className="text-blue-600 hover:underline">View</button>
