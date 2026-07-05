@@ -3,6 +3,7 @@ import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { Badge } from '../common/Badge';
 import { Pagination, usePaged } from '../common/Pagination';
+import { RowActions } from '../common/RowActions';
 import { inherentScore, residualScore, riskLevel, riskStatus, statusBadgeClass } from '../../domain/scoring';
 import type { Risk } from '../../data/models';
 
@@ -67,11 +68,7 @@ export function RiskTable({ risks }: { risks: Risk[] }) {
                   <td className="px-4 py-3"><span className="font-semibold text-sm">{r.assessment}</span></td>
                   <td className="px-4 py-3"><Badge className={statusBadgeClass(status)}>{status}</Badge></td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2 text-xs">
-                      {perms.edit && <button onClick={() => modals.editRisk(r.id)} className="text-blue-600 hover:underline">Edit</button>}
-                      {perms.remove && <button onClick={() => modals.deleteRiskFlow(r.id)} className="text-red-500 hover:underline">Delete</button>}
-                      {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
-                    </div>
+                    <RowActions onEdit={perms.edit ? () => modals.editRisk(r.id) : undefined} onDelete={perms.remove ? () => modals.deleteRiskFlow(r.id) : undefined} editLabel="Edit risk" deleteLabel="Delete risk" />
                   </td>
                 </tr>
               );

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
@@ -171,9 +172,7 @@ export function AwarenessPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-3 text-xs">
-                        {perms.edit && <button onClick={() => setEditing(c)} className="text-blue-600 hover:underline">Edit</button>}
-                        {perms.remove && <button onClick={() => del(c)} className="text-red-500 hover:underline">Delete</button>}
-                        {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
+                        {perms.edit || perms.remove ? <RowActions onEdit={perms.edit ? () => setEditing(c) : undefined} onDelete={perms.remove ? () => del(c) : undefined} editLabel="Edit course" deleteLabel="Delete course" /> : <span style={{ color: 'var(--text3)' }}>—</span>}
                       </div>
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
@@ -174,11 +175,7 @@ export function PoliciesPage() {
                       {!d.nextReview ? '—' : overdue ? <Pill text={`Overdue · ${d.nextReview}`} k="crit" /> : due ? <Pill text={`Due · ${d.nextReview}`} k="med" /> : <span style={{ color: 'var(--text2)' }}>{d.nextReview}</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-3 text-xs">
-                        {perms.edit && <button onClick={() => setEditing(d)} className="text-blue-600 hover:underline">Edit</button>}
-                        {perms.remove && <button onClick={() => del(d)} className="text-red-500 hover:underline">Delete</button>}
-                        {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
-                      </div>
+                      <RowActions onEdit={perms.edit ? () => setEditing(d) : undefined} onDelete={perms.remove ? () => del(d) : undefined} editLabel="Edit document" deleteLabel="Delete document" />
                     </td>
                   </tr>
                 );

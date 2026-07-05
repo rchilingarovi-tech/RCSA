@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
@@ -173,9 +174,7 @@ export function AccessPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-3 text-xs">
-                        {perms.edit && <button onClick={() => setEditing(r)} className="text-blue-600 hover:underline">Edit</button>}
-                        {perms.remove && <button onClick={() => del(r)} className="text-red-500 hover:underline">Delete</button>}
-                        {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
+                        {perms.edit || perms.remove ? <RowActions onEdit={perms.edit ? () => setEditing(r) : undefined} onDelete={perms.remove ? () => del(r) : undefined} editLabel="Edit campaign" deleteLabel="Delete campaign" /> : <span style={{ color: 'var(--text3)' }}>—</span>}
                       </div>
                     </td>
                   </tr>

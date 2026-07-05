@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { RowActions } from '../../components/common/RowActions';
 import { Ring } from '../../components/charts/Ring';
 import { PageHeader } from '../rcsa/PageHeader';
 import { useUi } from '../../components/common/UiProvider';
@@ -265,11 +266,7 @@ export function CompliancePage() {
                       <td className="px-4 py-3 text-sm">{c.owner || 'Unassigned'}</td>
                       <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{c.assessed || 'N/A'}</td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2 text-xs">
-                          {perms.edit && <button onClick={() => setEditing(c)} className="text-blue-600 hover:underline">Edit</button>}
-                          {perms.remove && <button onClick={() => del(c)} className="text-red-500 hover:underline">Delete</button>}
-                          {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
-                        </div>
+                        <RowActions onEdit={perms.edit ? () => setEditing(c) : undefined} onDelete={perms.remove ? () => del(c) : undefined} editLabel="Edit control" deleteLabel="Delete control" />
                       </td>
                     </tr>
                   ))

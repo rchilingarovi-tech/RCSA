@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
@@ -221,11 +222,7 @@ export function VendorsPage() {
                       ) : <span style={{ color: 'var(--text3)' }}>—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-3 text-xs">
-                        {perms.edit && <button onClick={() => setEditing(v)} className="text-blue-600 hover:underline">Edit</button>}
-                        {perms.remove && <button onClick={() => del(v)} className="text-red-500 hover:underline">Delete</button>}
-                        {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
-                      </div>
+                      <RowActions onEdit={perms.edit ? () => setEditing(v) : undefined} onDelete={perms.remove ? () => del(v) : undefined} editLabel="Edit vendor" deleteLabel="Delete vendor" />
                     </td>
                   </tr>
                 );

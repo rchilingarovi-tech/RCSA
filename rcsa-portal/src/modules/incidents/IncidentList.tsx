@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pill } from '../../components/common/Pill';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { RowActions } from '../../components/common/RowActions';
 import {
   INCIDENT_STATUSES,
   SEVERITY_RANK,
@@ -94,10 +95,9 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
                   <td className="px-3 py-3 text-sm whitespace-nowrap">{i.responsible || 'Unassigned'}</td>
                   <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(i.closedAt)}</td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-xs">
                       <button onClick={() => onView(i)} className="text-blue-600 hover:underline">View</button>
-                      {canEdit && <button onClick={() => onEdit(i)} className="text-blue-600 hover:underline">Edit</button>}
-                      {canRemove && <button onClick={() => onDelete(i)} className="text-red-500 hover:underline">Delete</button>}
+                      {(canEdit || canRemove) && <RowActions onEdit={canEdit ? () => onEdit(i) : undefined} onDelete={canRemove ? () => onDelete(i) : undefined} editLabel="Edit incident" deleteLabel="Delete incident" />}
                     </div>
                   </td>
                 </tr>

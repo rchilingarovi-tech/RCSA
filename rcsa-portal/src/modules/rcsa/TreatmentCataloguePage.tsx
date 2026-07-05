@@ -5,6 +5,7 @@ import { usePermissions } from '../../auth/usePermissions';
 import { PageHeader } from './PageHeader';
 import { Badge } from '../../components/common/Badge';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { RowActions } from '../../components/common/RowActions';
 import { treatmentStatus, statusBadgeClass } from '../../domain/scoring';
 
 const STATUS_OPTIONS = ['', 'Open', 'In Progress', 'Completed', 'Overdue'] as const;
@@ -96,11 +97,7 @@ export function TreatmentCataloguePage() {
                         <td className="px-4 py-3 text-sm">{t.dueDate || 'N/A'}</td>
                         <td className="px-4 py-3"><Badge className={statusBadgeClass(st)}>{st}</Badge></td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-2 text-xs">
-                            {perms.edit && <button onClick={() => modals.editTreatment(t.id)} className="text-blue-600 hover:underline">Edit</button>}
-                            {perms.remove && <button onClick={() => modals.deleteTreatmentFlow(t.id)} className="text-red-500 hover:underline">Delete</button>}
-                            {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
-                          </div>
+                          <RowActions onEdit={perms.edit ? () => modals.editTreatment(t.id) : undefined} onDelete={perms.remove ? () => modals.deleteTreatmentFlow(t.id) : undefined} editLabel="Edit treatment" deleteLabel="Delete treatment" />
                         </td>
                       </tr>
                     );
