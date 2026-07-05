@@ -4,7 +4,8 @@ import { SEED_USERS } from './seed';
 // Mutable local user directory (Phase 4). Seeded from SEED_USERS on first run.
 // Migration: replace with server-managed users / AD sync — the AuthProvider seam
 // is the only consumer.
-const KEY = 'infosec.auth.users.v1';
+// Bumped to v2 to re-seed the renamed demo accounts over any previously-stored v1 users.
+const KEY = 'infosec.auth.users.v2';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
