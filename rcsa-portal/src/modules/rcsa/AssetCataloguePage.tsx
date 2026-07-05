@@ -23,6 +23,18 @@ import type { Asset, DataClass } from '../../data/models';
 // so audit diffs and RBAC keep working exactly as before. The protected Risk /
 // Treatment modules and the shared data layer are untouched.
 
+// Small inline icons (scoped to this page so no shared component changes).
+const SearchIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+);
+const PencilIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+);
+const TrashIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" /></svg>
+);
+const iconBtn = 'w-8 h-8 rounded-lg border flex items-center justify-center transition-colors';
+
 const CRIT_TONE: Record<string, Tone> = { High: 'crit', Medium: 'med', Low: 'low' };
 const CRIT_ORDER = ['High', 'Medium', 'Low'] as const;
 
@@ -120,13 +132,16 @@ export function AssetCataloguePage() {
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search assets…"
-          className="border rounded-lg px-3 py-2 text-sm"
-          style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
-        />
+        <div className="relative" style={{ flex: '0 1 230px' }}>
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text3)' }}><SearchIcon /></span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search assets…"
+            className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+          />
+        </div>
         {filter.active && (
           <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>
             Filtered: {filter.active.label} ✕
@@ -186,9 +201,17 @@ export function AssetCataloguePage() {
                       {a.reviewDate ? (overdue ? <Pill text={`${a.reviewDate} · due`} k="crit" /> : <span style={{ color: 'var(--text2)' }}>{a.reviewDate}</span>) : '—'}
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-3 text-xs">
-                        {perms.edit && <button onClick={() => modals.editAsset(a.id)} className="text-blue-600 hover:underline">Edit</button>}
-                        {perms.remove && <button onClick={() => modals.deleteAssetFlow(a.id)} className="text-red-500 hover:underline">Delete</button>}
+                      <div className="flex gap-2">
+                        {perms.edit && (
+                          <button title="Edit asset" aria-label="Edit asset" onClick={() => modals.editAsset(a.id)} className={`${iconBtn} text-gray-400 hover:text-blue-600 hover:border-blue-300`} style={{ borderColor: 'var(--border)' }}>
+                            <PencilIcon />
+                          </button>
+                        )}
+                        {perms.remove && (
+                          <button title="Delete asset" aria-label="Delete asset" onClick={() => modals.deleteAssetFlow(a.id)} className={`${iconBtn} text-gray-400 hover:text-red-500 hover:border-red-300`} style={{ borderColor: 'var(--border)' }}>
+                            <TrashIcon />
+                          </button>
+                        )}
                         {!perms.edit && !perms.remove && <span style={{ color: 'var(--text3)' }}>—</span>}
                       </div>
                     </td>
