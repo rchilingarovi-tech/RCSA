@@ -86,7 +86,7 @@ export function MasterCalendarPage() {
   const { navigate } = useNav();
 
   const [view, setView] = useState<View>('month');
-  const [cursor, setCursor] = useState<Date>(() => new Date(`${todayIso}T00:00:00`));
+  const [cursor, setCursor] = useState<Date>(() => new Date(`${todayIso()}T00:00:00`));
   const [layers, setLayers] = useState<Set<LayerKey>>(() => new Set(LAYERS.map((l) => l.key)));
   const [selected, setSelected] = useState<CalEvent | null>(null);
   const [external, setExternal] = useState(readExternal);
@@ -169,7 +169,7 @@ export function MasterCalendarPage() {
               </>
             )}
             <div className="text-[17px] font-bold px-2" style={{ color: 'var(--text)' }}>{title}</div>
-            {dated && <button onClick={() => setCursor(new Date(`${todayIso}T00:00:00`))} className="text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-80" style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}>Today</button>}
+            {dated && <button onClick={() => setCursor(new Date(`${todayIso()}T00:00:00`))} className="text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-80" style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}>Today</button>}
           </div>
           <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
             {([['month', 'Month'], ['week', 'Week'], ['day', 'Day'], ['agenda', 'Agenda List']] as const).map(([v, label]) => (
@@ -439,7 +439,7 @@ function CalendarDashboard({
   onAgenda: () => void;
   activeLayers: Set<LayerKey>;
 }) {
-  const t = new Date(`${todayIso}T00:00:00`);
+  const t = new Date(`${todayIso()}T00:00:00`);
   const endOfWeek = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + (6 - t.getDay())));
   const endOfMonth = iso(new Date(t.getFullYear(), t.getMonth() + 1, 0));
   const in90 = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 90));

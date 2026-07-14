@@ -99,7 +99,7 @@ export function PlanPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample initiatives and discards your changes.', () => { setItems(planRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `yearly-plan-${today}.csv`,
+    `yearly-plan-${today()}.csv`,
     ['ID', 'Initiative', 'Category', 'Quarter', 'Owner', 'Priority', 'Progress %'],
     rows.map((i) => [i.id, i.initiative, i.category, i.quarter, i.owner, i.priority, i.progress]),
   );

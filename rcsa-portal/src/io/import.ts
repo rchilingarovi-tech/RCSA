@@ -269,7 +269,7 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
       reviewDate: get('Review Date'),
       evidence: parseList(get('Evidence')),
       notes: get('Notes'),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today,
+      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
     });
     if (isUpdate) updated += 1;
     else created += 1;
@@ -384,7 +384,7 @@ export async function parseRisksFile(
       acceptanceExpiry: get('Acceptance Expiry'),
       evidence: parseList(get('Evidence')),
       comments: parseList(get('Comments')),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today,
+      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
     });
     if (isUpdate) updated += 1;
     else created += 1;
@@ -477,7 +477,7 @@ export async function parseTreatmentsFile(
       status,
       evidence: parseList(get('Evidence')),
       comments: parseList(get('Comments')),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today,
+      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
     });
     if (isUpdate) updated += 1;
     else created += 1;

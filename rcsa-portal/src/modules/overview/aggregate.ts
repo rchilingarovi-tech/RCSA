@@ -58,12 +58,12 @@ export const assetCriticality = (a: Asset): Level => criticality(assetValue(a))[
 
 export function daysOverdue(dateIso: string): number {
   if (!dateIso) return 0;
-  const diff = new Date(today).getTime() - new Date(dateIso).getTime();
+  const diff = new Date(today()).getTime() - new Date(dateIso).getTime();
   return Math.max(0, Math.round(diff / 86400000));
 }
 export function daysUntil(dateIso: string): number | null {
   if (!dateIso) return null;
-  return Math.round((new Date(dateIso).getTime() - new Date(today).getTime()) / 86400000);
+  return Math.round((new Date(dateIso).getTime() - new Date(today()).getTime()) / 86400000);
 }
 
 /** Departments a risk touches, via its assets. */
@@ -197,7 +197,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   );
 
   data.vendors
-    .filter((v) => v.contractExpiry && v.contractExpiry < today)
+    .filter((v) => v.contractExpiry && v.contractExpiry < today())
     .forEach((v) =>
       out.push({
         id: `att-ven-${v.id}`,

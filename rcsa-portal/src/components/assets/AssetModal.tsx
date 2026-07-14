@@ -98,7 +98,7 @@ export function AssetModal({ editId }: { editId: string | null }) {
       reviewDate: form.reviewDate,
       notes: form.notes.trim(),
       evidence: [...evidence],
-      submittedAt: existing?.submittedAt || today,
+      submittedAt: existing?.submittedAt || today(),
     };
     void store.saveAsset(obj).then(() => {
       ui.toast(editId ? 'Asset updated' : 'Asset registered', 'bg-green-700');

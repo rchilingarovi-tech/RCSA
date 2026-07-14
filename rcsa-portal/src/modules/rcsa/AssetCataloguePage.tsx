@@ -96,7 +96,7 @@ export function AssetCataloguePage() {
     { l: 'Assets', v: assets.length },
     { l: 'High criticality', v: assets.filter((a) => critLabel(a) === 'High').length, t: 'crit' },
     { l: 'Internet-facing', v: assets.filter((a) => a.internet === 'Yes').length, t: 'high' },
-    { l: 'Reviews overdue', v: assets.filter((a) => a.reviewDate && a.reviewDate < today).length, t: 'med' },
+    { l: 'Reviews overdue', v: assets.filter((a) => a.reviewDate && a.reviewDate < today()).length, t: 'med' },
   ];
 
   return (
@@ -170,7 +170,7 @@ export function AssetCataloguePage() {
                 const v = assetValue(a);
                 const cl = critLabel(a);
                 const rc = riskCount.get(a.id) || 0;
-                const overdue = !!a.reviewDate && a.reviewDate < today;
+                const overdue = !!a.reviewDate && a.reviewDate < today();
                 return (
                   <tr key={a.id} className="risk-row cursor-pointer" onClick={() => modals.openSummary(a.id)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{a.id}</td>

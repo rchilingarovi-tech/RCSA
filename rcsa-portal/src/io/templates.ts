@@ -25,7 +25,7 @@ const ASSET_HEADERS = [
 ];
 
 export function downloadAssetTemplate(): void {
-  downloadCsv(`rcsa-assets-template-${today}.csv`, ASSET_HEADERS, {
+  downloadCsv(`rcsa-assets-template-${today()}.csv`, ASSET_HEADERS, {
     'Asset ID': '', // leave blank to auto-generate (AST-###); an existing ID updates that asset
     Name: 'Example Payroll Server',
     Process: 'Payroll',
@@ -54,7 +54,7 @@ const RISK_HEADERS = [
 ];
 
 export function downloadRiskTemplate(): void {
-  downloadCsv(`rcsa-risks-template-${today}.csv`, RISK_HEADERS, {
+  downloadCsv(`rcsa-risks-template-${today()}.csv`, RISK_HEADERS, {
     'Risk ID': '', // blank = auto-generate (RSK-###)
     'Asset ID': 'AST-001; AST-002', // one or more existing asset IDs, separated by ;
     Threat: 'Malware infection',
@@ -75,7 +75,7 @@ const TREATMENT_HEADERS = [
 ];
 
 export function downloadTreatmentTemplate(): void {
-  downloadCsv(`rcsa-treatments-template-${today}.csv`, TREATMENT_HEADERS, {
+  downloadCsv(`rcsa-treatments-template-${today()}.csv`, TREATMENT_HEADERS, {
     'Treatment ID': '', // blank = auto-generate (TRT-###)
     Title: 'Patch and harden DB engine',
     'Risk ID': 'RSK-001; RSK-002', // one or more existing risk IDs, separated by ;

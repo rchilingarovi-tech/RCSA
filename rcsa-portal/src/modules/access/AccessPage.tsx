@@ -27,7 +27,7 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
   const [scope, setScope] = useState(e?.scope ?? '');
   const [period, setPeriod] = useState(e?.period ?? '');
   const [reviewer, setReviewer] = useState(e?.reviewer ?? '');
-  const [due, setDue] = useState(e?.due ?? today);
+  const [due, setDue] = useState(e?.due ?? today());
   const [progress, setProgress] = useState(String(e?.progress ?? '0'));
 
   function submit(ev: FormEvent) {
@@ -95,7 +95,7 @@ export function AccessPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample campaigns and discards your changes.', () => { setReviews(accessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `access-reviews-${today}.csv`,
+    `access-reviews-${today()}.csv`,
     ['ID', 'Campaign', 'Scope', 'Period', 'Reviewer', 'Due', 'Progress %'],
     rows.map((r) => [r.id, r.campaign, r.scope, r.period, r.reviewer, r.due, r.progress]),
   );

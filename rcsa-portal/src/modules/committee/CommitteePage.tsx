@@ -26,7 +26,7 @@ function MeetingModal({ meeting, onClose, onSave }: { meeting: Meeting | 'new'; 
   const ui = useUi();
   const e = meeting === 'new' ? null : meeting;
   const [title, setTitle] = useState(e?.title ?? '');
-  const [date, setDate] = useState(e?.date ?? today);
+  const [date, setDate] = useState(e?.date ?? today());
   const [status, setStatus] = useState<MeetingStatus>(e?.status ?? 'Scheduled');
   const [openActions, setOpenActions] = useState(String(e?.openActions ?? '0'));
   const [attendance, setAttendance] = useState(e?.attendance ?? '');
@@ -94,7 +94,7 @@ export function CommitteePage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample meetings and discards your changes.', () => { setMeetings(committeeRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `committee-meetings-${today}.csv`,
+    `committee-meetings-${today()}.csv`,
     ['ID', 'Title', 'Date', 'Status', 'Open actions', 'Attendance', 'Decisions'],
     rows.map((m) => [m.id, m.title, m.date, m.status, m.openActions, m.attendance, m.decisions]),
   );

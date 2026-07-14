@@ -2,8 +2,11 @@ import type { Asset, Risk, Treatment } from '../data/models';
 
 // Pure domain logic — ported verbatim from the prototype (New Version.html L544-548).
 
-/** Today's date in ISO (YYYY-MM-DD), computed at module load like the prototype. */
-export const today = new Date().toISOString().split('T')[0];
+/** Today's date in ISO (YYYY-MM-DD). A function (not a module-load constant) so
+ *  long-lived tabs never evaluate overdue/expiry logic against a stale date. */
+export function today(): string {
+  return new Date().toISOString().split('T')[0];
+}
 
 export function assetValue(a: Pick<Asset, 'c' | 'i' | 'a'>): number {
   return a.c * a.i * a.a;
@@ -44,7 +47,7 @@ export function residualScore(r: Risk): number | null {
 
 /** A treatment is overdue if its due date has passed and it isn't completed. */
 export function isOverdue(t: Treatment): boolean {
-  return !!t.dueDate && t.status !== 'Completed' && t.dueDate < today;
+  return !!t.dueDate && t.status !== 'Completed' && t.dueDate < today();
 }
 
 /** The effective status of a single treatment (Overdue overrides). */

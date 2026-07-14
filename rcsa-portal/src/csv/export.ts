@@ -38,7 +38,7 @@ export function exportAssetsCsv(assets: Asset[]): void {
       a.internet, a.thirdParty, a.cloud, a.status, a.reviewDate, a.submittedAt, a.notes,
     ]);
   });
-  downloadCsv(`rcsa-assets-${today}.csv`, rows);
+  downloadCsv(`rcsa-assets-${today()}.csv`, rows);
 }
 
 export function exportRisksCsv(risks: Risk[], assets: Asset[], treatments: Treatment[]): void {
@@ -63,7 +63,7 @@ export function exportRisksCsv(risks: Risk[], assets: Asset[], treatments: Treat
       r.acceptanceExpiry, r.submittedAt,
     ]);
   });
-  downloadCsv(`rcsa-risks-${today}.csv`, rows);
+  downloadCsv(`rcsa-risks-${today()}.csv`, rows);
 }
 
 export function exportTreatmentsCsv(treatments: Treatment[]): void {
@@ -79,5 +79,5 @@ export function exportTreatmentsCsv(treatments: Treatment[]): void {
       t.description, (t.evidence || []).join('; '), (t.comments || []).join(' | '), t.submittedAt,
     ]);
   });
-  downloadCsv(`rcsa-treatments-${today}.csv`, rows);
+  downloadCsv(`rcsa-treatments-${today()}.csv`, rows);
 }

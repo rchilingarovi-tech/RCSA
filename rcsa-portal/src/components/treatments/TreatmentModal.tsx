@@ -72,7 +72,7 @@ export function TreatmentModal({ editId, riskId }: { editId: string | null; risk
       status,
       evidence: [...evidence],
       comments: [...comments],
-      submittedAt: existing?.submittedAt || today,
+      submittedAt: existing?.submittedAt || today(),
     };
     void store.saveTreatment(obj).then(() => {
       ui.toast(editId ? 'Treatment updated' : 'Treatment created', 'bg-green-700');

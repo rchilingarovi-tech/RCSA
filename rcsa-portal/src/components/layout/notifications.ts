@@ -34,8 +34,8 @@ export function buildNotifications(treatments: Treatment[]): AppNotification[] {
 
   const vendors = vendorRepo.list();
   const in120 = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
-  const expired = vendors.filter((v) => v.contractExpiry < today).length;
-  const renewing = vendors.filter((v) => v.contractExpiry >= today && v.contractExpiry <= in120).length;
+  const expired = vendors.filter((v) => v.contractExpiry < today()).length;
+  const renewing = vendors.filter((v) => v.contractExpiry >= today() && v.contractExpiry <= in120).length;
   if (expired) out.push({ id: 'ven-expired', moduleId: 'vendors', icon: 'building', k: 'crit', title: 'Vendor contracts expired', body: `${plural(expired, 'contract')} have lapsed.` });
   if (renewing) out.push({ id: 'ven-renew', moduleId: 'vendors', icon: 'clock', k: 'high', title: 'Vendor renewals due', body: `${plural(renewing, 'contract')} renewing within 120 days.` });
 

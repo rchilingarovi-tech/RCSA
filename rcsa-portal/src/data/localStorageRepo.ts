@@ -53,7 +53,7 @@ function deriveTreatments(legacy: LegacyRisk[]): Treatment[] {
       status: r.treatmentStatus || 'Open',
       evidence: [],
       comments: [],
-      submittedAt: today,
+      submittedAt: today(),
     });
   });
   return out;

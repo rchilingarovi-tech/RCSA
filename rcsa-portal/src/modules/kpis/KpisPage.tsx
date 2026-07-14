@@ -150,7 +150,7 @@ export function KpisPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample KPIs and discards your changes.', () => { setKpis(kpiRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `kpis-${today}.csv`,
+    `kpis-${today()}.csv`,
     ['ID', 'Name', 'Target', 'Current', 'Unit', 'Direction', 'RAG', 'History'],
     rows.map((k) => [k.id, k.name, k.target, k.current, k.unit, k.direction, ragLabel(rag(k)), k.history]),
   );

@@ -107,8 +107,8 @@ export function VendorsPage() {
     { key: 'band:Healthy', label: 'Healthy (<25)', tone: 'low' as Tone, pred: (v: Vendor) => v.score < 25 },
   ];
   const RENEWALS = [
-    { key: 'ren:Expired', label: 'Expired', tone: 'crit' as Tone, pred: (v: Vendor) => v.contractExpiry < today },
-    { key: 'ren:60', label: '≤60 days', tone: 'med' as Tone, pred: (v: Vendor) => v.contractExpiry >= today && v.contractExpiry < in60 },
+    { key: 'ren:Expired', label: 'Expired', tone: 'crit' as Tone, pred: (v: Vendor) => v.contractExpiry < today() },
+    { key: 'ren:60', label: '≤60 days', tone: 'med' as Tone, pred: (v: Vendor) => v.contractExpiry >= today() && v.contractExpiry < in60 },
     { key: 'ren:180', label: '≤180 days', tone: 'info' as Tone, pred: (v: Vendor) => v.contractExpiry >= in60 && v.contractExpiry < in180 },
     { key: 'ren:later', label: 'Later', tone: 'low' as Tone, pred: (v: Vendor) => v.contractExpiry >= in180 },
   ];
@@ -135,7 +135,7 @@ export function VendorsPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vendors and discards your changes.', () => { setVendors(vendorRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `vendors-${today}.csv`,
+    `vendors-${today()}.csv`,
     ['ID', 'Name', 'Criticality', 'Data access', 'Residual score', 'Band', 'Contract expiry', 'Certifications'],
     rows.map((v) => [v.id, v.name, v.criticality, v.dataAccess, v.score, scoreBand(v.score).label, v.contractExpiry, v.certs.join('; ')]),
   );
@@ -201,7 +201,7 @@ export function VendorsPage() {
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No vendors match{filter.active ? ' the selected chart slice' : ''}.</td></tr>
               ) : pager.pageItems.map((v) => {
                 const band = scoreBand(v.score);
-                const expired = v.contractExpiry < today;
+                const expired = v.contractExpiry < today();
                 const soon = !expired && v.contractExpiry < in60;
                 return (
                   <tr key={v.id} className="risk-row">

@@ -61,10 +61,10 @@ export function buildCalendarEvents(d: CalData): CalEvent[] {
   const out: CalEvent[] = [];
   const add = (e: Omit<CalEvent, 'status' | 'overdueDays'> & { done?: boolean }) => {
     if (!e.date) return;
-    const status: EventStatus = e.done ? 'Done' : e.date < today ? 'Overdue' : 'Upcoming';
+    const status: EventStatus = e.done ? 'Done' : e.date < today() ? 'Overdue' : 'Upcoming';
     const { done: _done, ...rest } = e;
     void _done;
-    out.push({ ...rest, status, overdueDays: status === 'Overdue' ? Math.max(0, daysBetween(e.date, today)) : 0 });
+    out.push({ ...rest, status, overdueDays: status === 'Overdue' ? Math.max(0, daysBetween(e.date, today())) : 0 });
   };
 
   d.treatments.forEach((t) =>
@@ -170,7 +170,7 @@ export function buildCalendarEvents(d: CalData): CalEvent[] {
 // ── Date helpers (local, date-only) ──────────────────────────────────────────
 export const iso = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-export const todayIso = today;
+export const todayIso = (): string => today();
 
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -189,7 +189,7 @@ export function monthCells(year: number, month: number): DayCell[] {
   const cells: DayCell[] = [];
   for (let i = 0; i < 42; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    cells.push({ date: iso(d), day: d.getDate(), inMonth: d.getMonth() === month, isToday: iso(d) === today });
+    cells.push({ date: iso(d), day: d.getDate(), inMonth: d.getMonth() === month, isToday: iso(d) === today() });
   }
   return cells;
 }
@@ -200,7 +200,7 @@ export function weekCells(ref: Date): DayCell[] {
   const cells: DayCell[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    cells.push({ date: iso(d), day: d.getDate(), inMonth: true, isToday: iso(d) === today });
+    cells.push({ date: iso(d), day: d.getDate(), inMonth: true, isToday: iso(d) === today() });
   }
   return cells;
 }
@@ -224,7 +224,7 @@ export interface Bucket {
 }
 
 export function agendaBuckets(events: CalEvent[]): Bucket[] {
-  const t = new Date(`${today}T00:00:00`);
+  const t = new Date(`${today()}T00:00:00`);
   const endOfWeek = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + (6 - t.getDay())));
   const endOfMonth = iso(new Date(t.getFullYear(), t.getMonth() + 1, 0));
   const endOfNextMonth = iso(new Date(t.getFullYear(), t.getMonth() + 2, 0));

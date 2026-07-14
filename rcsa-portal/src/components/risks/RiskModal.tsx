@@ -147,7 +147,7 @@ export function RiskModal({ editId, assetId }: { editId: string | null; assetId:
       ...(residualOn ? { resImpact: form.resImpact, resLikelihood: form.resLikelihood } : {}),
       assessment: form.assessment, controls: checked,
       acceptanceExpiry: form.acceptanceExpiry, evidence: [...evidence], comments: [...comments],
-      submittedAt: existing?.submittedAt || today,
+      submittedAt: existing?.submittedAt || today(),
     };
     void store.saveRisk(obj).then(() => {
       ui.toast(editId ? 'Risk updated' : 'Risk logged', 'bg-green-700');

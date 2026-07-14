@@ -29,7 +29,7 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
   const [type, setType] = useState<CourseType>(e?.type ?? 'Course');
   const [audience, setAudience] = useState(e?.audience ?? '');
   const [method, setMethod] = useState<Method>(e?.method ?? 'E-learning');
-  const [due, setDue] = useState(e?.due ?? today);
+  const [due, setDue] = useState(e?.due ?? today());
   const [completion, setCompletion] = useState(String(e?.completion ?? '0'));
 
   function submit(ev: FormEvent) {
@@ -94,7 +94,7 @@ export function AwarenessPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample courses and discards your changes.', () => { setCourses(awarenessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `awareness-${today}.csv`,
+    `awareness-${today()}.csv`,
     ['ID', 'Course', 'Type', 'Audience', 'Method', 'Due', 'Completion %'],
     rows.map((c) => [c.id, c.course, c.type, c.audience, c.method, c.due, c.completion]),
   );

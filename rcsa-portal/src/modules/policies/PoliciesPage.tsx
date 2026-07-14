@@ -73,8 +73,8 @@ export function PoliciesPage() {
 
   const in30 = iso(30);
   const CADENCE = [
-    { key: 'cad:Overdue', label: 'Overdue', tone: 'crit' as Tone, pred: (d: PolicyDoc) => d.status !== 'Retired' && !!d.nextReview && d.nextReview < today },
-    { key: 'cad:Due', label: 'Due ≤30 days', tone: 'med' as Tone, pred: (d: PolicyDoc) => d.status !== 'Retired' && !!d.nextReview && d.nextReview >= today && d.nextReview < in30 },
+    { key: 'cad:Overdue', label: 'Overdue', tone: 'crit' as Tone, pred: (d: PolicyDoc) => d.status !== 'Retired' && !!d.nextReview && d.nextReview < today() },
+    { key: 'cad:Due', label: 'Due ≤30 days', tone: 'med' as Tone, pred: (d: PolicyDoc) => d.status !== 'Retired' && !!d.nextReview && d.nextReview >= today() && d.nextReview < in30 },
     { key: 'cad:Scheduled', label: 'Scheduled', tone: 'low' as Tone, pred: (d: PolicyDoc) => !!d.nextReview && d.nextReview >= in30 },
     { key: 'cad:None', label: 'No date', tone: 'mut' as Tone, pred: (d: PolicyDoc) => !d.nextReview },
   ];
@@ -101,7 +101,7 @@ export function PoliciesPage() {
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample documents and discards your changes.', () => { setDocs(policyRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
   const exportCsv = () => downloadCsv(
-    `documents-${today}.csv`,
+    `documents-${today()}.csv`,
     ['ID', 'Title', 'Type', 'Version', 'Status', 'Owner', 'Next review'],
     rows.map((d) => [d.id, d.title, d.type, d.version, d.status, d.owner, d.nextReview]),
   );
@@ -161,7 +161,7 @@ export function PoliciesPage() {
               {pager.pageItems.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No documents match{filter.active ? ' the selected chart slice' : ''}.</td></tr>
               ) : pager.pageItems.map((d) => {
-                const overdue = d.status !== 'Retired' && !!d.nextReview && d.nextReview < today;
+                const overdue = d.status !== 'Retired' && !!d.nextReview && d.nextReview < today();
                 const due = !overdue && !!d.nextReview && d.nextReview < in30 && d.status !== 'Retired';
                 return (
                   <tr key={d.id} className="risk-row">
