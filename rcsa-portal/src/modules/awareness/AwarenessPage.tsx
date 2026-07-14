@@ -11,9 +11,7 @@ import {
   ChartGrid,
   ChartPanel,
   DonutChart,
-  HBarChart,
   useChartFilter,
-  type BarRow,
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
@@ -76,7 +74,10 @@ export function AwarenessPage() {
   const avg = courses.length ? Math.round(courses.reduce((s, c) => s + (Number(c.completion) || 0), 0) / courses.length) : 0;
 
   const typeSeg: DonutSegment[] = COURSE_TYPES.map((t) => ({ key: `ty:${t}`, label: t, tone: TYPE_TONE[t], value: courses.filter((c) => c.type === t).length }));
-  const completionRows: BarRow[] = courses.map((c) => ({ key: `c:${c.id}`, label: c.course, tone: (c.completion >= 100 ? 'low' : overdue(c) ? 'crit' : 'accent') as Tone, value: c.completion }));
+
+  // Signature widget: completion board — least-complete first, with audience /
+  // method context and a due chip. Click a row to filter the table.
+  const board = [...courses].sort((a, b) => a.completion - b.completion);
 
   const selectType = (key: string) => { const t = key.slice(3) as CourseType; filter.select(key, t, (c) => c.type === t); };
   const selectCourse = (key: string) => { const id = key.slice(2); const c = courses.find((x) => x.id === id); if (c) filter.select(key, c.course, (x) => x.id === id); };
@@ -116,8 +117,38 @@ export function AwarenessPage() {
         <ChartPanel title="Programme mix" span={4} filterLabel={chipFor('ty:')} onClearFilter={filter.clear}>
           <DonutChart segments={typeSeg} center={`${avg}%`} sub="avg completion" activeKey={filter.activeKey} onSelect={selectType} />
         </ChartPanel>
-        <ChartPanel title="Completion by course" span={8} filterLabel={chipFor('c:')} onClearFilter={filter.clear}>
-          <HBarChart rows={completionRows} max={100} suffix="%" activeKey={filter.activeKey} onSelect={selectCourse} />
+        <ChartPanel title="Completion board" span={8} filterLabel={chipFor('c:')} onClearFilter={filter.clear}>
+          {board.length === 0 ? (
+            <div style={{ padding: 18, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>No courses yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {board.map((c) => {
+                const late = overdue(c);
+                const fillColor = c.completion >= 100 ? 'var(--low)' : late ? 'var(--crit)' : 'var(--accent)';
+                const key = `c:${c.id}`;
+                const active = filter.activeKey === key;
+                return (
+                  <button key={c.id} onClick={() => selectCourse(key)} className="w-full flex items-center gap-3 text-left group">
+                    <span className="w-44 shrink-0 min-w-0">
+                      <span className="block text-[12px] font-semibold truncate" title={c.course} style={{ color: active ? 'var(--accent)' : 'var(--text)' }}>{c.course}</span>
+                      <span className="block text-[10.5px] truncate" style={{ color: 'var(--text3)' }}>{c.audience || 'All staff'} · {c.method}</span>
+                    </span>
+                    <span className="relative flex-1 h-4 rounded-md overflow-hidden" style={{ background: 'var(--surface3)', outline: active ? '2px solid var(--accent)' : 'none', outlineOffset: 1 }}>
+                      <span className="absolute inset-y-0 left-0 rounded-md transition-all group-hover:brightness-95" style={{ width: `${Math.max(c.completion > 0 ? 4 : 0, c.completion)}%`, background: fillColor }} />
+                    </span>
+                    <span className="w-9 text-right text-[12px] font-bold tabular-nums" style={{ color: 'var(--text)' }}>{c.completion}%</span>
+                    <span className="w-[86px] text-right">
+                      {late
+                        ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--crit-bg)', color: 'var(--crit)' }}>Overdue</span>
+                        : c.completion >= 100
+                          ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--low-bg)', color: 'var(--low)' }}>Done</span>
+                          : <span className="text-[10.5px]" style={{ color: 'var(--text3)' }}>{c.due || '—'}</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </ChartPanel>
       </ChartGrid>
 

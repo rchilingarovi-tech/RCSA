@@ -11,9 +11,7 @@ import {
   ChartGrid,
   ChartPanel,
   DonutChart,
-  HBarChart,
   useChartFilter,
-  type BarRow,
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
@@ -76,8 +74,10 @@ export function AccessPage() {
   ];
 
   const stateSeg: DonutSegment[] = STATES.map((s) => ({ key: s.key, label: s.label, tone: s.tone, value: reviews.filter(s.pred).length }));
-  const completionRows: BarRow[] = reviews
-    .map((r) => ({ key: `camp:${r.id}`, label: r.campaign, tone: (r.progress >= 100 ? 'low' : overdue(r) ? 'crit' : 'accent') as Tone, value: r.progress }));
+
+  // Signature widget: campaign progress board — least-complete first, with
+  // reviewer / period context and a due chip. Click a row to filter the table.
+  const board = [...reviews].sort((a, b) => a.progress - b.progress);
 
   const selectState = (key: string) => { const s = STATES.find((x) => x.key === key); if (s) filter.select(s.key, s.label, s.pred); };
   const selectCampaign = (key: string) => { const id = key.slice(5); const r = reviews.find((x) => x.id === id); if (r) filter.select(key, r.campaign, (x) => x.id === id); };
@@ -118,8 +118,38 @@ export function AccessPage() {
         <ChartPanel title="Campaign state" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={stateSeg} center={String(reviews.length)} sub="campaigns" activeKey={filter.activeKey} onSelect={selectState} />
         </ChartPanel>
-        <ChartPanel title="Completion by campaign" span={8} filterLabel={chipFor('camp:')} onClearFilter={filter.clear}>
-          <HBarChart rows={completionRows} max={100} suffix="%" activeKey={filter.activeKey} onSelect={selectCampaign} />
+        <ChartPanel title="Campaign progress board" span={8} filterLabel={chipFor('camp:')} onClearFilter={filter.clear}>
+          {board.length === 0 ? (
+            <div style={{ padding: 18, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>No campaigns yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {board.map((r) => {
+                const late = overdue(r);
+                const fillColor = r.progress >= 100 ? 'var(--low)' : late ? 'var(--crit)' : 'var(--accent)';
+                const key = `camp:${r.id}`;
+                const active = filter.activeKey === key;
+                return (
+                  <button key={r.id} onClick={() => selectCampaign(key)} className="w-full flex items-center gap-3 text-left group">
+                    <span className="w-44 shrink-0 min-w-0">
+                      <span className="block text-[12px] font-semibold truncate" title={r.campaign} style={{ color: active ? 'var(--accent)' : 'var(--text)' }}>{r.campaign}</span>
+                      <span className="block text-[10.5px] truncate" style={{ color: 'var(--text3)' }}>{r.reviewer || 'Unassigned'} · {r.period}</span>
+                    </span>
+                    <span className="relative flex-1 h-4 rounded-md overflow-hidden" style={{ background: 'var(--surface3)', outline: active ? '2px solid var(--accent)' : 'none', outlineOffset: 1 }}>
+                      <span className="absolute inset-y-0 left-0 rounded-md transition-all group-hover:brightness-95" style={{ width: `${Math.max(r.progress > 0 ? 4 : 0, r.progress)}%`, background: fillColor }} />
+                    </span>
+                    <span className="w-9 text-right text-[12px] font-bold tabular-nums" style={{ color: 'var(--text)' }}>{r.progress}%</span>
+                    <span className="w-[86px] text-right">
+                      {late
+                        ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--crit-bg)', color: 'var(--crit)' }}>Overdue</span>
+                        : r.progress >= 100
+                          ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--low-bg)', color: 'var(--low)' }}>Done</span>
+                          : <span className="text-[10.5px]" style={{ color: 'var(--text3)' }}>{r.due || '—'}</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </ChartPanel>
       </ChartGrid>
 

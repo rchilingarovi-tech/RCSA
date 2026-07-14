@@ -101,12 +101,6 @@ export function VendorsPage() {
 
   const in60 = iso(60), in180 = iso(180);
 
-  const BANDS = [
-    { key: 'band:Severe', label: 'Severe (60+)', tone: 'crit' as Tone, pred: (v: Vendor) => v.score >= 60 },
-    { key: 'band:Elevated', label: 'Elevated (40–59)', tone: 'high' as Tone, pred: (v: Vendor) => v.score >= 40 && v.score < 60 },
-    { key: 'band:Moderate', label: 'Moderate (25–39)', tone: 'med' as Tone, pred: (v: Vendor) => v.score >= 25 && v.score < 40 },
-    { key: 'band:Healthy', label: 'Healthy (<25)', tone: 'low' as Tone, pred: (v: Vendor) => v.score < 25 },
-  ];
   const RENEWALS = [
     { key: 'ren:Expired', label: 'Expired', tone: 'crit' as Tone, pred: (v: Vendor) => v.contractExpiry < today() },
     { key: 'ren:60', label: '≤60 days', tone: 'med' as Tone, pred: (v: Vendor) => v.contractExpiry >= today() && v.contractExpiry < in60 },
@@ -115,13 +109,17 @@ export function VendorsPage() {
   ];
 
   const critSeg: DonutSegment[] = CRITICALITIES.map((c) => ({ key: `crit:${c}`, label: c, tone: CRIT_TONE[c], value: vendors.filter((v) => v.criticality === c).length }));
-  const bandRows: BarRow[] = BANDS.map((b) => ({ key: b.key, label: b.label, tone: b.tone, value: vendors.filter(b.pred).length }));
   const renewRows: BarRow[] = RENEWALS.map((r) => ({ key: r.key, label: r.label, tone: r.tone, value: vendors.filter(r.pred).length }));
 
   const selectCrit = (key: string) => { const c = key.slice(5) as Criticality; filter.select(key, c, (v) => v.criticality === c); };
-  const selectBand = (key: string) => { const b = BANDS.find((x) => x.key === key); if (b) filter.select(b.key, b.label, b.pred); };
   const selectRenew = (key: string) => { const r = RENEWALS.find((x) => x.key === key); if (r) filter.select(r.key, r.label, r.pred); };
   const chipFor = (prefix: string) => (filter.active && filter.active.key.startsWith(prefix) ? filter.active.label : null);
+
+  // Signature widget: risk position matrix — criticality × residual-score band.
+  // Top-left (Critical × Severe) is the fire corner; each cell click-filters.
+  const BAND_ORDER = ['Severe', 'Elevated', 'Moderate', 'Healthy'] as const;
+  const BAND_TONE: Record<string, string> = { Severe: 'crit', Elevated: 'high', Moderate: 'med', Healthy: 'low' };
+  const inCell = (c: Criticality, b: string) => (v: Vendor) => v.criticality === c && scoreBand(v.score).label === b;
 
   const searched = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -159,8 +157,44 @@ export function VendorsPage() {
         <ChartPanel title="Vendor criticality" span={4} filterLabel={chipFor('crit:')} onClearFilter={filter.clear}>
           <DonutChart segments={critSeg} center={String(vendors.length)} sub="vendors" activeKey={filter.activeKey} onSelect={selectCrit} />
         </ChartPanel>
-        <ChartPanel title="Residual score bands" span={4} filterLabel={chipFor('band:')} onClearFilter={filter.clear}>
-          <HBarChart rows={bandRows} activeKey={filter.activeKey} onSelect={selectBand} />
+        <ChartPanel title="Risk position matrix" span={4} filterLabel={chipFor('mx:')} onClearFilter={filter.clear}>
+          <div>
+            <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(4, 1fr)' }}>
+              <div />
+              {BAND_ORDER.map((b) => (
+                <div key={b} className="text-center text-[9.5px] font-bold uppercase tracking-wide pb-0.5" style={{ color: `var(--${BAND_TONE[b]})` }}>{b}</div>
+              ))}
+              {CRITICALITIES.map((c) => (
+                <div key={c} className="contents">
+                  <div className="flex items-center justify-end pr-1.5 text-[11px] whitespace-nowrap" style={{ color: 'var(--text2)' }}>{c}</div>
+                  {BAND_ORDER.map((b) => {
+                    const pred = inCell(c, b);
+                    const n = vendors.filter(pred).length;
+                    const key = `mx:${c}|${b}`;
+                    const active = filter.activeKey === key;
+                    return (
+                      <button
+                        key={b}
+                        onClick={() => filter.select(key, `${c} · ${b}`, pred)}
+                        title={`${c} criticality · ${b} score: ${n} vendor${n === 1 ? '' : 's'}`}
+                        className="rounded-md py-2 text-[13px] font-bold tabular-nums transition-transform hover:scale-105"
+                        style={{
+                          background: n > 0 ? `var(--${BAND_TONE[b]})` : 'var(--surface3)',
+                          color: n > 0 ? '#fff' : 'var(--text3)',
+                          opacity: n > 0 ? 1 : 0.6,
+                          outline: active ? '2px solid var(--accent)' : 'none',
+                          outlineOffset: 1,
+                        }}
+                      >
+                        {n > 0 ? n : '·'}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <div className="text-[10.5px] mt-2 text-center" style={{ color: 'var(--text3)' }}>Criticality × residual score · click a cell to filter</div>
+          </div>
         </ChartPanel>
         <ChartPanel title="Contract renewals" span={4} filterLabel={chipFor('ren:')} onClearFilter={filter.clear}>
           <HBarChart rows={renewRows} activeKey={filter.activeKey} onSelect={selectRenew} />

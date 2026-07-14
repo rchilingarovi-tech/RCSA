@@ -82,7 +82,13 @@ export function PoliciesPage() {
 
   const statusSeg: DonutSegment[] = DOC_STATUSES.map((s) => ({ key: `st:${s}`, label: s, tone: STATUS_TONE[s], value: docs.filter((d) => d.status === s).length }));
   const typeRows: BarRow[] = DOC_TYPES.map((t) => ({ key: `ty:${t}`, label: t, tone: TYPE_TONE[t], value: docs.filter((d) => d.type === t).length }));
-  const cadenceRows: BarRow[] = CADENCE.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: docs.filter(c.pred).length }));
+
+  // Signature widget: review timeline — a proportional cadence strip plus the
+  // next reviews coming up, so the review calendar reads at a glance.
+  const nextReviews = docs
+    .filter((d) => d.status !== 'Retired' && d.nextReview)
+    .sort((a, b) => (a.nextReview < b.nextReview ? -1 : 1))
+    .slice(0, 4);
 
   const selectStatus = (key: string) => { const s = key.slice(3) as DocStatus; filter.select(key, s, (d) => d.status === s); };
   const selectType = (key: string) => { const t = key.slice(3) as DocType; filter.select(key, t, (d) => d.type === t); };
@@ -126,8 +132,52 @@ export function PoliciesPage() {
         <ChartPanel title="By type" span={4} filterLabel={chipFor('ty:')} onClearFilter={filter.clear}>
           <HBarChart rows={typeRows} activeKey={filter.activeKey} onSelect={selectType} />
         </ChartPanel>
-        <ChartPanel title="Review cadence" span={4} filterLabel={chipFor('cad:')} onClearFilter={filter.clear}>
-          <HBarChart rows={cadenceRows} activeKey={filter.activeKey} onSelect={selectCadence} />
+        <ChartPanel title="Review timeline" span={4} filterLabel={chipFor('cad:')} onClearFilter={filter.clear}>
+          <div>
+            {/* Proportional cadence strip — click a segment to filter */}
+            <div className="flex h-7 rounded-lg overflow-hidden" style={{ background: 'var(--surface3)' }}>
+              {CADENCE.map((c) => {
+                const n = docs.filter(c.pred).length;
+                if (n === 0) return null;
+                const active = filter.activeKey === c.key;
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => selectCadence(c.key)}
+                    title={`${c.label}: ${n} document${n === 1 ? '' : 's'}`}
+                    className="h-full flex items-center justify-center text-[11px] font-bold text-white transition-all hover:brightness-95"
+                    style={{ width: `${(n / Math.max(1, docs.length)) * 100}%`, background: `var(--${c.tone})`, outline: active ? '2px solid var(--accent)' : 'none', outlineOffset: -2, minWidth: 26 }}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              {CADENCE.map((c) => (
+                <span key={c.key} className="flex items-center gap-1.5 text-[10.5px]" style={{ color: 'var(--text3)' }}>
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: `var(--${c.tone})` }} />{c.label}
+                </span>
+              ))}
+            </div>
+            {/* Next reviews coming up */}
+            <div className="mt-3 pt-2 border-t space-y-1.5" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>Next reviews</div>
+              {nextReviews.length === 0 ? (
+                <div className="text-[12px]" style={{ color: 'var(--text3)' }}>No reviews scheduled.</div>
+              ) : nextReviews.map((d) => {
+                const late = d.nextReview < today();
+                const soon = !late && d.nextReview < in30;
+                const k = late ? 'crit' : soon ? 'med' : 'low';
+                return (
+                  <div key={d.id} className="flex items-center gap-2 text-[12px]">
+                    <span className="flex-1 truncate" title={d.title} style={{ color: 'var(--text2)' }}>{d.title}</span>
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: `var(--${k}-bg)`, color: `var(--${k})` }}>{d.nextReview}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </ChartPanel>
       </ChartGrid>
 
