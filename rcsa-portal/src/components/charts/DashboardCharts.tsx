@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bar, Doughnut, Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, type ChartOptions } from 'chart.js';
-import './registerCharts';
-import { ChartCard } from './ChartCard';
-import { Heatmap } from './Heatmap';
 import { useStore } from '../../state/AppStore';
-import { getDashboardScope } from '../../state/filters';
+import { getDashboardScope, type GlobalFilter } from '../../state/filters';
 import { assetValue, criticality, isOverdue, treatmentStatus } from '../../domain/scoring';
-import { useTheme } from '../../state/ThemeProvider';
-import { chartPalette } from './chartTheme';
+import { ChartGrid, ChartPanel, HBarChart, type BarRow } from './primitives';
 
-type IndexHandler = (index: number) => void;
+// RCSA dashboard charts — rebuilt on the shared token primitives with a STRICT
+// colour policy: colour carries meaning only.
+//   · severity / level scales → crit / high / med / low
+//   · statuses → their established tokens (Overdue=crit, Open=high, …)
+//   · neutral categories (departments, threats) → ONE colour; length is the signal
+// Every widget keeps the exact same cross-filter click contract as before:
+// clicking sets a GlobalFilter facet and the whole dashboard re-scopes together.
 
-// Chart catalogue — used by the show/hide "Customize" menu.
+type IndexFilter = (g: GlobalFilter) => void;
+
+// Chart catalogue — used by the show/hide "Customize" menu (same ids/key as before).
 const CHART_DEFS: { id: string; label: string }[] = [
   { id: 'criticality', label: 'Asset Criticality' },
   { id: 'treatment', label: 'Treatment Status' },
@@ -39,26 +41,97 @@ function readVisible(): Set<string> {
   return new Set(ALL_IDS);
 }
 
-/** Base options: hidden legend + centered title + click-by-index handler. */
-function baseOptions(title: string, onIndex: IndexHandler, textColor: string): ChartOptions<any> {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: { display: true, text: title, color: textColor, font: { size: 14 } },
-    },
-    onClick: (_e: unknown, els: { index: number }[]) => {
-      if (els.length) onIndex(els[0].index);
-    },
-  };
+// ── Meter rows (label · count · share · proportional bar) ────────────────────
+interface MeterRow {
+  label: string;
+  value: number;
+  tone: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+function MeterRows({ rows }: { rows: MeterRow[] }) {
+  const total = Math.max(1, rows.reduce((s, r) => s + r.value, 0));
+  return (
+    <div className="flex flex-col justify-center gap-3 h-full">
+      {rows.map((r) => {
+        const pct = Math.round((r.value / total) * 100);
+        return (
+          <button key={r.label} onClick={r.onClick} className="text-left group">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: `var(--${r.tone})` }} />
+              <span className="text-[12.5px]" style={{ color: r.active ? 'var(--accent)' : 'var(--text2)', fontWeight: r.active ? 700 : 500 }}>{r.label}</span>
+              <span className="ml-auto text-[14px] font-bold tabular-nums" style={{ color: 'var(--text)' }}>{r.value}</span>
+              <span className="text-[11px] tabular-nums w-9 text-right" style={{ color: 'var(--text3)' }}>{pct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface3)', outline: r.active ? '2px solid var(--accent)' : 'none', outlineOffset: 1 }}>
+              <span className="block h-full rounded-full transition-all group-hover:brightness-95" style={{ width: `${Math.max(r.value > 0 ? 5 : 0, pct)}%`, background: `var(--${r.tone})` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Residual heat map (5×5, score-band tones, click-to-filter) ───────────────
+const cellTone = (score: number): string => (score <= 4 ? 'low' : score <= 9 ? 'med' : score <= 14 ? 'high' : 'crit');
+
+function HeatGrid({ count, active, onCell }: { count: (i: number, l: number) => number; active: { i: number; l: number } | null; onCell: (i: number, l: number) => void }) {
+  const impacts = [5, 4, 3, 2, 1];
+  const likelihoods = [1, 2, 3, 4, 5];
+  return (
+    <div>
+      <div className="flex gap-2">
+        <div className="flex items-center">
+          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: 'var(--text3)' }}>Impact</span>
+        </div>
+        <div className="flex-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(5, 1fr)' }}>
+            {impacts.map((imp) => (
+              <div key={imp} className="contents">
+                <div className="flex items-center justify-center text-[11px] font-semibold pr-1" style={{ color: 'var(--text3)' }}>{imp}</div>
+                {likelihoods.map((lik) => {
+                  const n = count(imp, lik);
+                  const tone = cellTone(imp * lik);
+                  const isActive = active?.i === imp && active?.l === lik;
+                  return (
+                    <button
+                      key={lik}
+                      onClick={() => onCell(imp, lik)}
+                      title={`Impact ${imp} × Likelihood ${lik}: ${n} risk${n === 1 ? '' : 's'}`}
+                      className="aspect-square rounded-md flex items-center justify-center text-[13px] font-bold tabular-nums transition-transform hover:scale-105"
+                      style={{
+                        background: n > 0 ? `var(--${tone})` : `var(--${tone}-bg)`,
+                        color: n > 0 ? '#fff' : 'var(--text3)',
+                        opacity: n > 0 ? 1 : 0.55,
+                        outline: isActive ? '2.5px solid var(--accent)' : 'none',
+                        outlineOffset: 1,
+                      }}
+                    >
+                      {n > 0 ? n : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            <div />
+            {likelihoods.map((lik) => (
+              <div key={lik} className="text-center text-[11px] font-semibold pt-1" style={{ color: 'var(--text3)' }}>{lik}</div>
+            ))}
+          </div>
+          <div className="text-center text-[10px] font-bold uppercase tracking-wider mt-1.5" style={{ color: 'var(--text3)' }}>Likelihood</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DashboardCharts() {
   const store = useStore();
   const { setGlobalFilter } = store;
-  const { theme } = useTheme();
-  const pal = useMemo(() => chartPalette(theme), [theme]);
+  const g = store.globalFilter;
+  const apply: IndexFilter = setGlobalFilter;
 
   const [visible, setVisible] = useState<Set<string>>(readVisible);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -73,13 +146,7 @@ export function DashboardCharts() {
       return next;
     });
 
-  useEffect(() => {
-    ChartJS.defaults.color = pal.text;
-    ChartJS.defaults.borderColor = pal.grid;
-  }, [pal]);
-
-  // Unified cross-filter: every chart click sets a facet; the whole dashboard
-  // re-scopes together (asset filters + risk slicers + facet).
+  // Unified cross-filter scope (unchanged logic).
   const { assets, risks, treatments } = useMemo(
     () =>
       getDashboardScope({
@@ -94,72 +161,75 @@ export function DashboardCharts() {
     [store.assets, store.risks, store.treatments, store.selectedAssetId, store.globalFilter, store.assetFilters, store.riskFilters],
   );
 
-  // 1. Asset Criticality
+  // 1. Asset Criticality — semantic level scale.
   const crit = useMemo(() => {
     const counts: Record<'Low' | 'Medium' | 'High', number> = { Low: 0, Medium: 0, High: 0 };
     assets.forEach((a) => { counts[criticality(assetValue(a))[0] as 'Low' | 'Medium' | 'High']++; });
     return counts;
   }, [assets]);
-  const critKeys = Object.keys(crit) as (keyof typeof crit)[];
+  const CRIT_TONE: Record<string, string> = { Low: 'low', Medium: 'med', High: 'crit' };
 
-  // 2. Treatment Status — counts of treatment entities by effective status.
+  // 2. Treatment Status — status tokens.
   const treat = useMemo(() => {
     const counts: Record<string, number> = { Open: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
     treatments.forEach((t) => { counts[treatmentStatus(t)] = (counts[treatmentStatus(t)] || 0) + 1; });
     return counts;
   }, [treatments]);
-  const treatKeys = Object.keys(treat);
+  const TREAT_TONE: Record<string, string> = { Open: 'high', 'In Progress': 'info', Completed: 'low', Overdue: 'crit' };
 
-  // 3. Residual Heat Map (grid) — count of risks at each residual Impact × Likelihood.
+  // 3. Residual Heat Map.
   const heatCount = (impact: number, likelihood: number) =>
     risks.filter((r) => r.resImpact === impact && r.resLikelihood === likelihood).length;
-  const heatActive = store.globalFilter?.type === 'riskHeat' ? store.globalFilter.value : null;
+  const heatActive = g?.type === 'riskHeat' ? g.value : null;
 
-  // 4. Risks by Department — a shared risk counts in EACH department it touches.
-  const dept = useMemo(() => {
+  // 4. Risks by Department — neutral category → ONE colour, ranked.
+  const deptRows: BarRow[] = useMemo(() => {
     const counts: Record<string, number> = {};
     risks.forEach((r) => {
-      const depts = new Set(
-        r.assetIds.map((id) => assets.find((x) => x.id === id)?.department).filter(Boolean) as string[],
-      );
+      const depts = new Set(r.assetIds.map((id) => assets.find((x) => x.id === id)?.department).filter(Boolean) as string[]);
       depts.forEach((d) => { counts[d] = (counts[d] || 0) + 1; });
     });
-    return counts;
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7)
+      .map(([d, n]) => ({ key: `dept:${d}`, label: d, tone: 'accent' as const, value: n }));
   }, [assets, risks]);
-  const deptKeys = Object.keys(dept);
 
-  // 5. Top 5 Threats
-  const topThreats = useMemo(() => {
+  // 5. Top 5 Threats — neutral category → ONE colour, ranked.
+  const threatRows: BarRow[] = useMemo(() => {
     const counts: Record<string, number> = {};
     risks.forEach((r) => { counts[r.threat] = (counts[r.threat] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([t, n]) => ({ key: `thr:${t}`, label: t, tone: 'accent' as const, value: n }));
   }, [risks]);
 
-  // 6. Overdue by Owner — overdue treatment entities grouped by treatment owner.
-  const overdue = useMemo(() => {
+  // 6. Overdue by Owner — overdue is red, full stop.
+  const overdueRows: BarRow[] = useMemo(() => {
     const counts: Record<string, number> = {};
     treatments.filter(isOverdue).forEach((t) => {
       const key = t.owner || 'Unassigned';
       counts[key] = (counts[key] || 0) + 1;
     });
-    return counts;
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([o, n]) => ({ key: `own:${o}`, label: o, tone: 'crit' as const, value: n }));
   }, [treatments]);
-  const overdueKeys = Object.keys(overdue);
 
-  // 7. Accepted Risks by Dept — shared risks count in each department they touch.
-  const accepted = useMemo(() => {
+  // 7. Accepted Risks by Dept — acceptance is a deliberate decision → purple.
+  const acceptedRows: BarRow[] = useMemo(() => {
     const counts: Record<string, number> = {};
     risks.filter((r) => r.assessment === 'Accept').forEach((r) => {
-      const depts = new Set(
-        r.assetIds.map((id) => assets.find((x) => x.id === id)?.department).filter(Boolean) as string[],
-      );
+      const depts = new Set(r.assetIds.map((id) => assets.find((x) => x.id === id)?.department).filter(Boolean) as string[]);
       depts.forEach((d) => { counts[d] = (counts[d] || 0) + 1; });
     });
-    return counts;
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([d, n]) => ({ key: `acc:${d}`, label: d, tone: 'purple' as const, value: n }));
   }, [assets, risks]);
-  const acceptedKeys = Object.keys(accepted);
 
-  // 8. Control Coverage Gaps
+  // 8. Control Coverage Gaps — semantic: none=red, thin=amber, covered=green.
   const gap = useMemo(() => {
     const counts = { '0 Controls': 0, '1-2 Controls': 0, '3+ Controls': 0 };
     risks.forEach((r) => {
@@ -170,17 +240,13 @@ export function DashboardCharts() {
     });
     return counts;
   }, [risks]);
-  const gapKeys = Object.keys(gap);
-
-  // Fewer visible charts → taller cards, so the survivors grow to fill the space
-  // instead of leaving a short, stranded row. Width grows automatically via the
-  // auto-fit grid below.
-  const visibleCount = ALL_IDS.filter((id) => visible.has(id)).length;
-  const cardHeight = visibleCount <= 1 ? 460 : visibleCount <= 2 ? 380 : visibleCount <= 4 ? 320 : 260;
+  const GAP_TONE = ['crit', 'med', 'low'];
+  const gapKeys = Object.keys(gap) as (keyof typeof gap)[];
 
   return (
-    <div className="mb-4" style={{ ['--chart-h' as string]: `${cardHeight}px` }}>
-      <div className="flex justify-end mb-2 relative">
+    <div className="mb-4">
+      <div className="flex items-center justify-end gap-3 mb-2 relative">
+        <span className="text-[11.5px]" style={{ color: 'var(--text3)' }}>Every chart is a filter — click to slice the whole dashboard.</span>
         <button onClick={() => setMenuOpen((o) => !o)} className="btn-neutral border rounded px-3 py-1.5 text-sm">⚙ Customize</button>
         {menuOpen && (
           <>
@@ -200,117 +266,97 @@ export function DashboardCharts() {
         )}
       </div>
 
-      <div className="chart-grid" style={{ ['--chart-cols' as string]: Math.min(visibleCount, 4) }}>
+      <ChartGrid>
         {show('criticality') && (
-          <ChartCard title="Click a bar to filter by criticality">
-            <Bar
-              data={{ labels: critKeys, datasets: [{ data: critKeys.map((k) => crit[k]), backgroundColor: pal.bar, borderRadius: 6 }] }}
-              options={baseOptions('Asset Criticality Pipeline', (i) =>
-                setGlobalFilter({ type: 'assetCriticality', value: critKeys[i], label: `Assets: ${critKeys[i]} Criticality` }), pal.text)}
-            />
-          </ChartCard>
+          <ChartPanel title="Asset criticality" span={4}>
+            <MeterRows rows={(['Low', 'Medium', 'High'] as const).map((k) => ({
+              label: k,
+              value: crit[k],
+              tone: CRIT_TONE[k],
+              active: g?.type === 'assetCriticality' && g.value === k,
+              onClick: () => apply({ type: 'assetCriticality', value: k, label: `Assets: ${k} Criticality` }),
+            }))} />
+          </ChartPanel>
         )}
 
         {show('treatment') && (
-          <ChartCard title="Click a segment to filter by treatment status">
-            <Doughnut
-              data={{ labels: treatKeys, datasets: [{ data: treatKeys.map((k) => treat[k]), backgroundColor: pal.donut, borderColor: pal.grid, borderWidth: 1 }] }}
-              options={{
-                ...baseOptions('Risk Treatment Status', (i) => {
-                  const lbl = treatKeys[i];
-                  if (lbl === 'Overdue') setGlobalFilter({ type: 'riskOverdue', value: true, label: 'Overdue Risk Plans' });
-                  else setGlobalFilter({ type: 'riskStatus', value: lbl, label: `Risks: ${lbl} Status` });
-                }, pal.text),
-                plugins: {
-                  legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } },
-                  title: { display: true, text: 'Risk Treatment Status', color: pal.text },
-                },
-              }}
-            />
-          </ChartCard>
-        )}
-
-        {show('heatmap') && (
-          <ChartCard title="Click a cell to filter by residual Impact × Likelihood">
-            <Heatmap
-              count={heatCount}
-              active={heatActive}
-              onCell={(impact, likelihood) =>
-                setGlobalFilter({ type: 'riskHeat', value: { i: impact, l: likelihood }, label: `Risks: Impact ${impact}, Likelihood ${likelihood}` })}
-            />
-          </ChartCard>
-        )}
-
-        {show('department') && (
-          <ChartCard title="Click a bar to filter by department">
-            <Bar
-              data={{ labels: deptKeys, datasets: [{ data: deptKeys.map((k) => dept[k]), backgroundColor: deptKeys.map((_, i) => pal.dept[i % pal.dept.length]), borderRadius: 6 }] }}
-              options={baseOptions('Risks by Department', (i) =>
-                setGlobalFilter({ type: 'riskDept', value: deptKeys[i], label: `Risks for Dept: ${deptKeys[i]}` }), pal.text)}
-            />
-          </ChartCard>
-        )}
-
-        {show('threats') && (
-          <ChartCard title="Click a bar to filter by threat">
-            <Bar
-              data={{
-                labels: topThreats.map((t) => (t[0].length > 15 ? t[0].substring(0, 15) + '...' : t[0])),
-                datasets: [{ data: topThreats.map((t) => t[1]), backgroundColor: pal.threats, borderRadius: 6 }],
-              }}
-              options={{
-                ...baseOptions('Top 5 Threats', (i) =>
-                  setGlobalFilter({ type: 'riskThreat', value: topThreats[i][0], label: `Risks: Threat - ${topThreats[i][0]}` }), pal.text),
-                indexAxis: 'y',
-              }}
-            />
-          </ChartCard>
-        )}
-
-        {show('overdue') && (
-          <ChartCard title="Click a bar to filter overdue by owner">
-            <Bar
-              data={{
-                labels: overdueKeys.length ? overdueKeys : ['None'],
-                datasets: [{ data: overdueKeys.length ? overdueKeys.map((k) => overdue[k]) : [0], backgroundColor: pal.overdue, borderRadius: 6 }],
-              }}
-              options={baseOptions('Overdue by Owner', (i) => {
-                if (overdueKeys.length) setGlobalFilter({ type: 'riskOverdueOwner', value: overdueKeys[i], label: `Overdue Risks for ${overdueKeys[i]}` });
-              }, pal.text)}
-            />
-          </ChartCard>
-        )}
-
-        {show('accepted') && (
-          <ChartCard title="Click a segment to filter accepted by department">
-            <Pie
-              data={{
-                labels: acceptedKeys.length ? acceptedKeys : ['None'],
-                datasets: [{ data: acceptedKeys.length ? acceptedKeys.map((k) => accepted[k]) : [1], backgroundColor: pal.accepted, borderColor: pal.grid, borderWidth: 1 }],
-              }}
-              options={{
-                ...baseOptions('Accepted Risks', (i) => {
-                  if (acceptedKeys.length) setGlobalFilter({ type: 'riskAcceptedDept', value: acceptedKeys[i], label: `Accepted Risks for Dept: ${acceptedKeys[i]}` });
-                }, pal.text),
-                plugins: {
-                  legend: { display: true, position: 'right', labels: { boxWidth: 10 } },
-                  title: { display: true, text: 'Accepted Risks', color: pal.text },
-                },
-              }}
-            />
-          </ChartCard>
+          <ChartPanel title="Treatment status" span={4}>
+            <MeterRows rows={Object.keys(treat).map((k) => ({
+              label: k,
+              value: treat[k],
+              tone: TREAT_TONE[k] ?? 'mut',
+              active: k === 'Overdue' ? g?.type === 'riskOverdue' : g?.type === 'riskStatus' && g.value === k,
+              onClick: () =>
+                k === 'Overdue'
+                  ? apply({ type: 'riskOverdue', value: true, label: 'Overdue Risk Plans' })
+                  : apply({ type: 'riskStatus', value: k, label: `Risks: ${k} Status` }),
+            }))} />
+          </ChartPanel>
         )}
 
         {show('gaps') && (
-          <ChartCard title="Click a bar to filter by control coverage">
-            <Bar
-              data={{ labels: gapKeys, datasets: [{ data: gapKeys.map((k) => gap[k as keyof typeof gap]), backgroundColor: pal.gaps, borderRadius: 6 }] }}
-              options={baseOptions('Control Coverage Gaps', (i) =>
-                setGlobalFilter({ type: 'riskControlCount', value: i as 0 | 1 | 2, label: `Risks with ${gapKeys[i]}` }), pal.text)}
-            />
-          </ChartCard>
+          <ChartPanel title="Control coverage" span={4}>
+            <MeterRows rows={gapKeys.map((k, i) => ({
+              label: k,
+              value: gap[k],
+              tone: GAP_TONE[i],
+              active: g?.type === 'riskControlCount' && g.value === i,
+              onClick: () => apply({ type: 'riskControlCount', value: i as 0 | 1 | 2, label: `Risks with ${k}` }),
+            }))} />
+          </ChartPanel>
         )}
-      </div>
+
+        {show('heatmap') && (
+          <ChartPanel title="Residual heat map" span={4}>
+            <HeatGrid
+              count={heatCount}
+              active={heatActive}
+              onCell={(impact, likelihood) =>
+                apply({ type: 'riskHeat', value: { i: impact, l: likelihood }, label: `Risks: Impact ${impact}, Likelihood ${likelihood}` })}
+            />
+          </ChartPanel>
+        )}
+
+        {show('department') && (
+          <ChartPanel title="Risks by department" span={4}>
+            <HBarChart
+              rows={deptRows}
+              activeKey={g?.type === 'riskDept' ? `dept:${g.value}` : null}
+              onSelect={(key) => { const d = key.slice(5); apply({ type: 'riskDept', value: d, label: `Risks for Dept: ${d}` }); }}
+            />
+          </ChartPanel>
+        )}
+
+        {show('threats') && (
+          <ChartPanel title="Top threats" span={4}>
+            <HBarChart
+              rows={threatRows}
+              activeKey={g?.type === 'riskThreat' ? `thr:${g.value}` : null}
+              onSelect={(key) => { const t = key.slice(4); apply({ type: 'riskThreat', value: t, label: `Risks: Threat - ${t}` }); }}
+            />
+          </ChartPanel>
+        )}
+
+        {show('overdue') && (
+          <ChartPanel title="Overdue treatments by owner" span={6}>
+            <HBarChart
+              rows={overdueRows}
+              activeKey={g?.type === 'riskOverdueOwner' ? `own:${g.value}` : null}
+              onSelect={(key) => { const o = key.slice(4); apply({ type: 'riskOverdueOwner', value: o, label: `Overdue Risks for ${o}` }); }}
+            />
+          </ChartPanel>
+        )}
+
+        {show('accepted') && (
+          <ChartPanel title="Accepted risks by department" span={6}>
+            <HBarChart
+              rows={acceptedRows}
+              activeKey={g?.type === 'riskAcceptedDept' ? `acc:${g.value}` : null}
+              onSelect={(key) => { const d = key.slice(4); apply({ type: 'riskAcceptedDept', value: d, label: `Accepted Risks for Dept: ${d}` }); }}
+            />
+          </ChartPanel>
+        )}
+      </ChartGrid>
     </div>
   );
 }
