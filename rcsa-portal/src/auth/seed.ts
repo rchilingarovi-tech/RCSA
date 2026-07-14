@@ -49,6 +49,8 @@ export const SEED_USERS: StoredUser[] = [
     active: true,
     defaultRole: null, // no access unless explicitly granted
     overrides: {
+      overview: 'viewer', // executive dashboard is visible to everyone with a login
+      'master-calendar': 'viewer', // the shared calendar is visible to everyone with a login
       'access-reviews': 'editor',
       vendors: 'editor',
       'rcsa-dashboard': 'viewer',

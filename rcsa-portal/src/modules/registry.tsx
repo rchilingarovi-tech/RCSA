@@ -1,4 +1,6 @@
 import type { ComponentType } from 'react';
+import { OverviewPage } from './overview/OverviewPage';
+import { MasterCalendarPage } from './calendar/MasterCalendarPage';
 import { RcsaDashboard } from './rcsa/RcsaDashboard';
 import { AssetCataloguePage } from './rcsa/AssetCataloguePage';
 import { RiskCataloguePage } from './rcsa/RiskCataloguePage';
@@ -39,14 +41,32 @@ export interface ModuleDef {
   Component?: ComponentType;
 }
 
-export const MODULE_GROUPS = ['RCSA', 'Risk & Compliance', 'Security Operations', 'Governance', 'Planning & Performance', 'Administration'] as const;
+export const MODULE_GROUPS = ['Overview', 'RCSA', 'Risk & Compliance', 'Security Operations', 'Governance', 'Planning & Performance', 'Administration'] as const;
 export type ModuleGroup = (typeof MODULE_GROUPS)[number];
 
 export const MODULES: ModuleDef[] = [
   {
-    id: 'rcsa-dashboard',
+    id: 'overview',
     label: 'Dashboard',
     icon: 'grid',
+    group: 'Overview',
+    status: 'active',
+    description: 'Executive overview of security risk, compliance and performance.',
+    Component: OverviewPage,
+  },
+  {
+    id: 'master-calendar',
+    label: 'Master Calendar',
+    icon: 'calendar',
+    group: 'Overview',
+    status: 'active',
+    description: 'Centralized schedule tracking all compliance deadlines, risk treatments, renewals, and overdues.',
+    Component: MasterCalendarPage,
+  },
+  {
+    id: 'rcsa-dashboard',
+    label: 'RCSA Dashboard',
+    icon: 'shield',
     group: 'RCSA',
     status: 'active',
     description: 'Risk & control overview with cross-filtering charts.',
@@ -189,7 +209,7 @@ export const MODULES: ModuleDef[] = [
   },
 ];
 
-export const DEFAULT_MODULE_ID = 'rcsa-dashboard';
+export const DEFAULT_MODULE_ID = 'overview';
 
 /** Gateable module ids — used by the auth layer to resolve per-module access.
  * Footer-pinned items (e.g. Settings) are always reachable and gated internally,
