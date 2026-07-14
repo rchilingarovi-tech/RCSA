@@ -3,6 +3,7 @@ import { AppStoreProvider } from './state/AppStore';
 import { ModalsProvider } from './state/ModalsProvider';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginPage } from './components/auth/LoginPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // AuthProvider is the outermost seam (local auth now, server session after
 // migration). When signed out we show the login page; when signed in, the RCSA
@@ -21,8 +22,10 @@ function AuthGate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
