@@ -7,6 +7,7 @@ import type {
   Level,
   OverdueTreatmentRow,
   Priority,
+  ServiceTile,
   TopResidual,
   UpcomingItem,
 } from './aggregate';
@@ -435,6 +436,58 @@ export function UpcomingList({ items, onOpen }: { items: UpcomingItem[]; onOpen:
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+// ── Service health grid (one posture tile per service) ──────────────────────
+export function ServiceHealthGrid({ tiles, onOpen }: { tiles: ServiceTile[]; onOpen: (moduleId: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-4">
+      {tiles.map((t) => (
+        <button
+          key={t.moduleId}
+          onClick={() => onOpen(t.moduleId)}
+          className="rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface2)' }}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `var(--${t.tone}-bg)`, color: `var(--${t.tone})` }}>
+              <Icon name={t.icon} size={15} />
+            </span>
+            <span className="text-[11.5px] font-semibold truncate" style={{ color: 'var(--text2)' }}>{t.label}</span>
+          </span>
+          <span className="block tabular-nums text-[22px] font-bold mt-1.5 leading-none" style={{ color: `var(--${t.tone})` }}>{t.value}</span>
+          <span className="block text-[11px] mt-1 truncate" title={t.sub} style={{ color: 'var(--text3)' }}>{t.sub}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Generic watch list (compact id · label · pill · right-text rows) ────────
+export interface WatchRow {
+  id: string;
+  label: string;
+  pill: string;
+  pillTone: string;
+  right: string;
+}
+
+export function WatchList({ rows, empty, onOpen }: { rows: WatchRow[]; empty: string; onOpen: () => void }) {
+  if (rows.length === 0) return <Empty label={empty} />;
+  return (
+    <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+      {rows.map((r) => (
+        <li key={r.id}>
+          <button onClick={onOpen} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left risk-row">
+            <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: 'var(--accent)' }}>{r.id}</span>
+            <span className="min-w-0 flex-1 text-[12.5px] font-medium truncate" title={r.label} style={{ color: 'var(--text)' }}>{r.label}</span>
+            <Pill text={r.pill} k={r.pillTone} />
+            <span className="text-[11px] whitespace-nowrap w-16 text-right" style={{ color: 'var(--text3)' }}>{r.right}</span>
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }

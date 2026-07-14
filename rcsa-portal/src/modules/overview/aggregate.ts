@@ -94,6 +94,10 @@ export interface Headline {
   complianceScore: number;
   openIncidents: number;
   openCriticalHigh: number;
+  openVulns: number;
+  vulnsBreached: number;
+  openFindings: number;
+  findingsOverdue: number;
 }
 
 /** Asset ids that have at least one treatment (via any risk that references them). */
@@ -113,6 +117,8 @@ export function headline(
   treatments: Treatment[],
   incidents: Incident[],
   controls: ComplianceControl[],
+  vulns: Vuln[],
+  findings: Finding[],
 ): Headline {
   const highValue = assets.filter((a) => assetCriticality(a) === 'High');
   const covered = coveredAssetIds(risks, treatments);
@@ -125,7 +131,50 @@ export function headline(
     complianceScore: coverage(controls),
     openIncidents: openInc.length,
     openCriticalHigh: openInc.filter((i) => i.severity === 'Critical' || i.severity === 'High').length,
+    openVulns: vulns.filter(isOpenVuln).length,
+    vulnsBreached: vulns.filter(slaBreached).length,
+    openFindings: findings.filter(isOpenFinding).length,
+    findingsOverdue: findings.filter(findingOverdue).length,
   };
+}
+
+// ── Service health tiles (one posture tile per service, for the main dashboard) ─
+export interface ServiceTile {
+  moduleId: string;
+  icon: string;
+  label: string;
+  value: number;
+  sub: string;
+  tone: string;
+}
+
+export function serviceHealth(d: OverviewData): ServiceTile[] {
+  const expired = d.vendors.filter((v) => v.contractExpiry && v.contractExpiry < today()).length;
+  const renewing = d.vendors.filter((v) => { const n = daysUntil(v.contractExpiry); return n != null && n >= 0 && n <= 60; }).length;
+
+  const polOverdue = d.policies.filter((p) => p.status !== 'Retired' && (daysToReview(p.nextReview) ?? 1) < 0).length;
+  const polDue = d.policies.filter((p) => { if (p.status === 'Retired') return false; const n = daysToReview(p.nextReview); return n != null && n >= 0 && n <= 30; }).length;
+
+  const acrLate = d.accessReviews.filter(accessOverdue).length;
+  const acrAvg = d.accessReviews.length ? Math.round(d.accessReviews.reduce((s, r) => s + (Number(r.progress) || 0), 0) / d.accessReviews.length) : 0;
+
+  const trnLate = d.courses.filter(courseOverdue).length;
+  const trnAvg = d.courses.length ? Math.round(d.courses.reduce((s, c) => s + (Number(c.completion) || 0), 0) / d.courses.length) : 0;
+
+  const kpiOff = d.kpis.filter((k) => rag(k) === 'crit').length;
+  const kpiRisk = d.kpis.filter((k) => rag(k) === 'med').length;
+
+  const openActions = d.meetings.reduce((s, m) => s + (Number(m.openActions) || 0), 0);
+  const nextMeeting = d.meetings.filter((m) => m.status === 'Scheduled' && m.date >= today()).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+
+  return [
+    { moduleId: 'vendors', icon: 'building', label: 'Third-Party Vendors', value: expired + renewing, sub: `${expired} expired · ${renewing} renewing ≤60d`, tone: expired > 0 ? 'crit' : renewing > 0 ? 'med' : 'low' },
+    { moduleId: 'policies', icon: 'doc', label: 'Policies & Documents', value: polOverdue + polDue, sub: `${polOverdue} overdue · ${polDue} due ≤30d`, tone: polOverdue > 0 ? 'crit' : polDue > 0 ? 'med' : 'low' },
+    { moduleId: 'access-reviews', icon: 'key', label: 'Access Reviews', value: acrLate, sub: `${acrLate} overdue · ${acrAvg}% avg progress`, tone: acrLate > 0 ? 'crit' : 'low' },
+    { moduleId: 'awareness', icon: 'grad', label: 'Awareness Training', value: trnLate, sub: `${trnLate} overdue · ${trnAvg}% avg completion`, tone: trnLate > 0 ? 'crit' : trnAvg >= 90 ? 'low' : 'med' },
+    { moduleId: 'kpis', icon: 'chart', label: 'Department KPIs', value: kpiOff, sub: `${kpiOff} off track · ${kpiRisk} at risk`, tone: kpiOff > 0 ? 'crit' : kpiRisk > 0 ? 'med' : 'low' },
+    { moduleId: 'committee', icon: 'users', label: 'Committee', value: openActions, sub: nextMeeting ? `Next meeting ${nextMeeting.date}` : 'No meeting scheduled', tone: openActions > 0 ? 'med' : 'low' },
+  ];
 }
 
 // ── CISO attention items (unified, prioritised worklist) ─────────────────────

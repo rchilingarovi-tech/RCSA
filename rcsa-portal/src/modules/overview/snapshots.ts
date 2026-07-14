@@ -10,6 +10,10 @@ export interface OverviewSnapshot {
   highValueAssets: number;
   complianceScore: number;
   openIncidents: number;
+  // Added when the dashboard went cross-service — optional so snapshots recorded
+  // before then still parse (their deltas simply stay hidden until history exists).
+  vulnsBreached?: number;
+  findingsOverdue?: number;
 }
 
 export type SnapshotMetrics = Omit<OverviewSnapshot, 'date'>;

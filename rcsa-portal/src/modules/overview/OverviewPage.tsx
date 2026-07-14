@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/AppStore';
 import { useNav } from '../../state/NavContext';
-import { treatmentStatus } from '../../domain/scoring';
+import { usePermissions } from '../../auth/usePermissions';
 import { Icon } from '../../components/common/Icon';
 import { PageHeader } from '../rcsa/PageHeader';
+import { auditLog } from '../../audit/auditLog';
 import { incidentRepo } from '../incidents/repo';
+import { SEVERITY_RANK, daysOpen, isOpen, severityColor } from '../incidents/types';
 import { vendorRepo } from '../vendors/repo';
 import { policyRepo } from '../policies/repo';
 import { accessRepo } from '../access/repo';
@@ -18,32 +20,25 @@ import {
   buildAttentionItems,
   buildUpcoming,
   headline,
-  indexAssets,
-  overdueTreatmentRows,
-  residualHeatmap,
-  residualLevel,
-  riskDepartments,
-  risksByDepartment,
-  topResidualRisks,
-  assetCriticality,
-  effectiveLevel,
+  serviceHealth,
   type OverviewData,
 } from './aggregate';
 import { previousSnapshot, recordSnapshot } from './snapshots';
 import {
   AttentionTable,
-  DeptBars,
-  DEFAULT_FILTERS,
-  FilterBar,
   FooterStatus,
   KpiCard,
-  OverdueTable,
   Panel,
-  ResidualHeatmap,
-  TopResidualTable,
+  ServiceHealthGrid,
   UpcomingList,
-  type DashFilters,
+  WatchList,
+  type WatchRow,
 } from './widgets';
+
+// Executive overview — deliberately CROSS-SERVICE. RCSA has its own dashboard
+// page, so it gets exactly one KPI card here; the rest of the page reads posture
+// across every module (incidents, vulns, findings, compliance, vendors, policies,
+// access, awareness, KPIs, committee).
 
 const HIDE_KEY = 'infosec.overview.hidden';
 const readHidden = (): Set<string> => {
@@ -57,11 +52,13 @@ const readHidden = (): Set<string> => {
 
 const QUICK_ACTIONS: { label: string; module: string; icon: string }[] = [
   { label: 'New incident', module: 'incidents', icon: 'bolt' },
-  { label: 'New risk', module: 'risk-catalogue', icon: 'alert' },
-  { label: 'New asset', module: 'asset-catalogue', icon: 'box' },
-  { label: 'New treatment', module: 'treatment-catalogue', icon: 'tool' },
+  { label: 'New vulnerability', module: 'vulns', icon: 'alert' },
+  { label: 'New finding', module: 'findings', icon: 'edit' },
+  { label: 'New risk', module: 'risk-catalogue', icon: 'shield' },
   { label: 'Log committee meeting', module: 'committee', icon: 'users' },
 ];
+
+const ACTION_DOT: Record<string, string> = { create: 'low', update: 'info', delete: 'crit', reset: 'high', rights: 'med', session: 'mut' };
 
 function fmtNow(): string {
   const d = new Date();
@@ -70,16 +67,32 @@ function fmtNow(): string {
   return `${date} ${time}`;
 }
 
+function relTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  if (Number.isNaN(diff)) return '';
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+/** Headline metrics that have a matching snapshot field for trend deltas. */
+type TrendMetric = 'criticalResidual' | 'complianceScore' | 'openIncidents' | 'vulnsBreached' | 'findingsOverdue';
+
 export function OverviewPage() {
   const store = useStore();
   const { navigate } = useNav();
+  const auditPerms = usePermissions('audit-log');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const [filters, setFilters] = useState<DashFilters>(DEFAULT_FILTERS);
   const [q, setQ] = useState('');
   const [menu, setMenu] = useState<'customize' | 'quick' | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(readHidden);
   const [prev] = useState(previousSnapshot); // captured before today's snapshot is written
+  const [events, setEvents] = useState(() => auditLog.list().slice(0, 6));
+  useEffect(() => auditLog.subscribe(() => setEvents(auditLog.list().slice(0, 6))), []);
 
   const show = (key: string) => !hidden.has(key);
   const toggleSection = (key: string) => {
@@ -110,8 +123,8 @@ export function OverviewPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [menu]);
 
-  // Standalone module data — read once per mount (re-reads whenever you return to
-  // the dashboard). RCSA data comes from the reactive store.
+  // Standalone module data — read once per mount (re-reads whenever you return
+  // to the dashboard). RCSA data comes from the reactive store.
   const external = useMemo(
     () => ({
       incidents: incidentRepo.list(),
@@ -129,51 +142,14 @@ export function OverviewPage() {
   );
 
   const { assets, risks, treatments } = store;
-  const assetById = useMemo(() => indexAssets(assets), [assets]);
-  const departments = useMemo(
-    () => [...new Set(assets.map((a) => a.department).filter(Boolean))].sort(),
-    [assets],
+  const data: OverviewData = useMemo(() => ({ assets, risks, treatments, ...external }), [assets, risks, treatments, external]);
+
+  const full = useMemo(
+    () => headline(assets, risks, treatments, external.incidents, external.controls, external.vulns, external.findings),
+    [assets, risks, treatments, external],
   );
 
-  // ── Apply the global filters to the RCSA sets ──
-  const treatmentDepartments = (riskIds: string[]): string[] => {
-    const set = new Set<string>();
-    riskIds.forEach((rid) => {
-      const r = risks.find((x) => x.id === rid);
-      r?.assetIds.forEach((aid) => { const d = assetById.get(aid)?.department; if (d) set.add(d); });
-    });
-    return [...set];
-  };
-
-  const assetsF = useMemo(
-    () => assets.filter((a) => (!filters.dept || a.department === filters.dept) && (!filters.crit || assetCriticality(a) === filters.crit)),
-    [assets, filters.dept, filters.crit],
-  );
-  const risksF = useMemo(
-    () => risks.filter((r) => {
-      if (filters.dept && !riskDepartments(r, assetById).includes(filters.dept)) return false;
-      if (filters.level && effectiveLevel(r) !== filters.level) return false;
-      if (filters.crit && !r.assetIds.some((id) => { const a = assetById.get(id); return a && assetCriticality(a) === filters.crit; })) return false;
-      return true;
-    }),
-    [risks, assetById, filters.dept, filters.level, filters.crit],
-  );
-  const treatmentsF = useMemo(
-    () => treatments.filter((t) => {
-      if (filters.status && treatmentStatus(t) !== filters.status) return false;
-      if (filters.dept && !treatmentDepartments(t.riskIds).includes(filters.dept)) return false;
-      return true;
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [treatments, risks, assetById, filters.status, filters.dept],
-  );
-
-  // ── Headline metrics: full (for trend + snapshot) and view (filtered) ──
-  const full = useMemo(() => headline(assets, risks, treatments, external.incidents, external.controls), [assets, risks, treatments, external]);
-  const view = useMemo(() => headline(assetsF, risksF, treatmentsF, external.incidents, external.controls), [assetsF, risksF, treatmentsF, external]);
-  const filtersActive = !!(filters.dept || filters.crit || filters.level || filters.status);
-
-  // Record today's org-wide snapshot once.
+  // Record today's org-wide snapshot once (idempotent within a day).
   useEffect(() => {
     recordSnapshot({
       criticalResidual: full.criticalResidual,
@@ -181,39 +157,58 @@ export function OverviewPage() {
       highValueAssets: full.highValueAssets,
       complianceScore: full.complianceScore,
       openIncidents: full.openIncidents,
+      vulnsBreached: full.vulnsBreached,
+      findingsOverdue: full.findingsOverdue,
     });
   }, [full]);
 
-  const delta = (metric: keyof typeof full): number | null =>
-    !filtersActive && prev ? (full[metric] as number) - (prev[metric as keyof typeof prev] as number) : null;
+  const delta = (metric: TrendMetric): number | null => {
+    if (!prev) return null;
+    const before = prev[metric];
+    return before == null ? null : full[metric] - before;
+  };
   const periodLabel = prev ? `since ${prev.date}` : '';
-
-  const assessedResidual = useMemo(() => risksF.filter((r) => residualLevel(r) != null).length, [risksF]);
 
   // ── Widget datasets ──
   const matches = (s: string) => !q.trim() || s.toLowerCase().includes(q.trim().toLowerCase());
 
-  const attention = useMemo(() => {
-    const data: OverviewData = { assets, risks: risksF, treatments: treatmentsF, ...external };
-    return buildAttentionItems(data).filter((it) => matches(`${it.label} ${it.source} ${it.owner}`));
+  const attention = useMemo(
+    () => buildAttentionItems(data).filter((it) => matches(`${it.label} ${it.source} ${it.owner}`)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assets, risksF, treatmentsF, external, q]);
+    [data, q],
+  );
+  const upcoming = useMemo(
+    () => buildUpcoming(data, 90).filter((it) => matches(`${it.title} ${it.subtext}`)).slice(0, 7),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, q],
+  );
+  const tiles = useMemo(() => serviceHealth(data), [data]);
 
-  const heatmap = useMemo(() => residualHeatmap(risksF), [risksF]);
-  const deptRows = useMemo(() => risksByDepartment(risksF, assetById, 7), [risksF, assetById]);
-  const topResidual = useMemo(() => topResidualRisks(risksF, 8).filter((r) => matches(`${r.id} ${r.assetId} ${r.level}`)).slice(0, 5), [risksF, q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const overdueRows = useMemo(() => overdueTreatmentRows(treatmentsF, 12).filter((r) => matches(`${r.id} ${r.riskId}`)).slice(0, 6), [treatmentsF, q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const horizon = filters.range === 'all' ? 3650 : Number(filters.range);
-  const upcoming = useMemo(() => {
-    const data: OverviewData = { assets, risks, treatments, ...external };
-    return buildUpcoming(data, horizon).filter((it) => matches(`${it.title} ${it.subtext}`)).slice(0, 7);
+  const incidentWatch: WatchRow[] = useMemo(
+    () =>
+      external.incidents
+        .filter(isOpen)
+        .sort((a, b) => {
+          const s = SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity];
+          return s !== 0 ? s : a.reportedAt < b.reportedAt ? -1 : 1; // oldest fires first
+        })
+        .filter((i) => matches(`${i.id} ${i.shortDesc} ${i.responsible}`))
+        .slice(0, 6)
+        .map((i) => ({
+          id: i.id,
+          label: i.shortDesc,
+          pill: i.severity,
+          pillTone: severityColor(i.severity),
+          right: `${daysOpen(i) ?? 0}d open`,
+        })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assets, risks, treatments, external, horizon, q]);
+    [external.incidents, q],
+  );
 
   const SECTIONS = [
-    { key: 'filters', label: 'Global filters' },
-    { key: 'heatmap', label: 'Risk heat map' },
-    { key: 'dept', label: 'Risks by department' },
+    { key: 'health', label: 'Service health' },
+    { key: 'incidents', label: 'Incident watch' },
+    { key: 'activity', label: 'Recent activity' },
     { key: 'upcoming', label: 'Upcoming deadlines' },
   ];
 
@@ -230,7 +225,7 @@ export function OverviewPage() {
             ref={searchRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search assets, risks, treatments, vendors…"
+            placeholder="Search attention items, incidents, deadlines…"
             className="w-full border rounded-full pl-9 pr-12 py-2 text-sm"
             style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
           />
@@ -269,44 +264,55 @@ export function OverviewPage() {
       </PageHeader>
 
       <div className="p-6 space-y-4">
-        {show('filters') && <FilterBar filters={filters} setFilters={setFilters} departments={departments} />}
-
-        {/* KPI row */}
+        {/* KPI row — one card per domain (RCSA gets exactly one; it has its own page) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <KpiCard icon="shield" tone="crit" title="Critical residual risks" value={String(view.criticalResidual)} sub={`${assessedResidual} residual risks assessed`} delta={delta('criticalResidual')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View risks" onClick={() => navigate('risk-catalogue')} />
-          <KpiCard icon="clock" tone="high" title="Overdue treatments" value={String(view.overdueTreatments)} sub="Past their due date" delta={delta('overdueTreatments')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View treatments" onClick={() => navigate('treatment-catalogue')} />
-          <KpiCard icon="alert" tone="med" title="High-value assets" value={String(view.highValueAssets)} sub={`${view.lowCoverageHighValue} with low control coverage`} delta={delta('highValueAssets')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View assets" onClick={() => navigate('asset-catalogue')} />
-          <KpiCard icon="check" tone="low" title="Compliance score" value={`${view.complianceScore}%`} sub="Across all frameworks" delta={delta('complianceScore')} higherIsBetter={true} periodLabel={periodLabel} linkLabel="View compliance" onClick={() => navigate('compliance')} />
-          <KpiCard icon="doc" tone="info" title="Open incidents" value={String(full.openIncidents)} sub={`${full.openCriticalHigh} critical / high`} delta={delta('openIncidents')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View incidents" onClick={() => navigate('incidents')} />
+          <KpiCard icon="shield" tone="crit" title="Critical residual risks" value={String(full.criticalResidual)} sub={`${full.overdueTreatments} treatments overdue`} delta={delta('criticalResidual')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="RCSA dashboard" onClick={() => navigate('rcsa-dashboard')} />
+          <KpiCard icon="bolt" tone="info" title="Open incidents" value={String(full.openIncidents)} sub={`${full.openCriticalHigh} critical / high`} delta={delta('openIncidents')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View incidents" onClick={() => navigate('incidents')} />
+          <KpiCard icon="alert" tone="high" title="Vuln SLA breaches" value={String(full.vulnsBreached)} sub={`${full.openVulns} open vulnerabilities`} delta={delta('vulnsBreached')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View vulnerabilities" onClick={() => navigate('vulns')} />
+          <KpiCard icon="edit" tone="med" title="Findings overdue" value={String(full.findingsOverdue)} sub={`${full.openFindings} open audit findings`} delta={delta('findingsOverdue')} higherIsBetter={false} periodLabel={periodLabel} linkLabel="View findings" onClick={() => navigate('findings')} />
+          <KpiCard icon="check" tone="low" title="Compliance score" value={`${full.complianceScore}%`} sub="Across all frameworks" delta={delta('complianceScore')} higherIsBetter={true} periodLabel={periodLabel} linkLabel="View compliance" onClick={() => navigate('compliance')} />
         </div>
 
-        {/* Middle row — equal height */}
+        {/* Middle row — cross-service worklist + per-service posture */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <Panel title="Top CISO attention items" meta={attention.length} footer="View all attention items" onFooter={() => navigate('risk-catalogue')} className="lg:col-span-5">
-            <AttentionTable items={attention.slice(0, 5)} onOpen={navigate} />
+          <Panel title="Top CISO attention items" meta={attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} className="lg:col-span-6">
+            <AttentionTable items={attention.slice(0, 6)} onOpen={navigate} />
           </Panel>
-          {show('heatmap') && (
-            <Panel title="Risk heat map (residual)" footer="Open risk catalogue" onFooter={() => navigate('risk-catalogue')} className="lg:col-span-3" center>
-              <ResidualHeatmap matrix={heatmap} />
-            </Panel>
-          )}
-          {show('dept') && (
-            <Panel title="Risks by department" meta="Top 7" footer="View full report" onFooter={() => navigate('risk-catalogue')} className={show('heatmap') ? 'lg:col-span-4' : 'lg:col-span-7'} center>
-              <DeptBars rows={deptRows} />
+          {show('health') && (
+            <Panel title="Service health" meta={`${tiles.length} services`} className="lg:col-span-6">
+              <ServiceHealthGrid tiles={tiles} onOpen={navigate} />
             </Panel>
           )}
         </div>
 
-        {/* Bottom row — equal height */}
+        {/* Bottom row — ops watch + cross-service activity + what's next */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-          <Panel title="Top residual risks" footer="View all risks" onFooter={() => navigate('risk-catalogue')}>
-            <TopResidualTable rows={topResidual} onOpen={() => navigate('risk-catalogue')} />
-          </Panel>
-          <Panel title="Overdue treatments" footer="View all treatments" onFooter={() => navigate('treatment-catalogue')}>
-            <OverdueTable rows={overdueRows} onOpen={() => navigate('treatment-catalogue')} />
-          </Panel>
+          {show('incidents') && (
+            <Panel title="Open incident watch" footer="View all incidents" onFooter={() => navigate('incidents')}>
+              <WatchList rows={incidentWatch} empty="No open incidents. 🎉" onOpen={() => navigate('incidents')} />
+            </Panel>
+          )}
+          {show('activity') && auditPerms.view && (
+            <Panel title="Recent activity" meta="All services" footer="View audit log" onFooter={() => navigate('audit-log')}>
+              {events.length === 0 ? (
+                <div className="px-5 py-8 text-center text-sm" style={{ color: 'var(--text3)' }}>No recent activity yet.</div>
+              ) : (
+                <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                  {events.map((e) => (
+                    <li key={e.id} className="px-5 py-2.5 flex items-center gap-3 text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: `var(--${ACTION_DOT[e.action] ?? 'mut'})` }} />
+                      <span className="min-w-0 flex-1 truncate" style={{ color: 'var(--text2)' }}>
+                        <b style={{ color: 'var(--text)' }}>{e.actor}</b> · {e.summary}
+                      </span>
+                      <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text3)' }}>{relTime(e.ts)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          )}
           {show('upcoming') && (
-            <Panel title="Upcoming reviews & deadlines" footer="View policies & reviews" onFooter={() => navigate('policies')}>
+            <Panel title="Upcoming reviews & deadlines" meta="Next 90 days" footer="Open master calendar" onFooter={() => navigate('master-calendar')}>
               <UpcomingList items={upcoming} onOpen={navigate} />
             </Panel>
           )}
