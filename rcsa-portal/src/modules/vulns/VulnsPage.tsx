@@ -11,9 +11,7 @@ import {
   ChartGrid,
   ChartPanel,
   DonutChart,
-  HBarChart,
   useChartFilter,
-  type BarRow,
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
@@ -112,20 +110,6 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
   );
 }
 
-type SlaBand = 'Breached' | 'Due ≤ 7 days' | 'Within SLA';
-const slaBand = (v: Vuln): SlaBand | null => {
-  if (!isOpenVuln(v)) return null;
-  const left = slaDaysLeft(v);
-  if (left == null) return null;
-  if (left < 0) return 'Breached';
-  if (left <= 7) return 'Due ≤ 7 days';
-  return 'Within SLA';
-};
-const SLA_BANDS: { label: SlaBand; tone: Tone }[] = [
-  { label: 'Breached', tone: 'crit' },
-  { label: 'Due ≤ 7 days', tone: 'med' },
-  { label: 'Within SLA', tone: 'low' },
-];
 
 export function VulnsPage() {
   const ui = useUi();
@@ -150,17 +134,17 @@ export function VulnsPage() {
   const sevSeg: DonutSegment[] = VULN_SEVERITIES.map((s) => ({
     key: `sev:${s}`, label: s, tone: severityTone[s] as Tone, value: open.filter((v) => v.severity === s).length,
   }));
-  const slaRows: BarRow[] = SLA_BANDS.map((b) => ({
-    key: `sla:${b.label}`, label: b.label, tone: b.tone, value: open.filter((v) => slaBand(v) === b.label).length,
-  }));
-  const statusRows: BarRow[] = VULN_STATUSES.map((s) => ({
-    key: `st:${s}`, label: s, tone: statusTone[s] as Tone, value: vulns.filter((v) => v.status === s).length,
-  }));
 
   const selectSev = (key: string) => { const s = key.slice(4) as VulnSeverity; filter.select(key, s, (v) => v.severity === s && isOpenVuln(v)); };
-  const selectSla = (key: string) => { const b = key.slice(4) as SlaBand; filter.select(key, b, (v) => slaBand(v) === b); };
-  const selectStatus = (key: string) => { const s = key.slice(3) as VulnStatus; filter.select(key, s, (v) => v.status === s); };
   const chipFor = (prefix: string) => (filter.active && filter.active.key.startsWith(prefix) ? filter.active.label : null);
+
+  // Signature widget: SLA runway — each open vuln plotted against today.
+  // Left of the centre line = days past the SLA; right = days of runway left.
+  const runway = open
+    .map((v) => ({ v, left: slaDaysLeft(v) ?? 0 }))
+    .sort((a, b) => a.left - b.left)
+    .slice(0, 8);
+  const runwayCap = Math.max(14, ...runway.map((r) => Math.min(60, Math.abs(r.left))));
 
   const searched = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -198,11 +182,37 @@ export function VulnsPage() {
         <ChartPanel title="Open by severity" span={4} filterLabel={chipFor('sev:')} onClearFilter={filter.clear}>
           <DonutChart segments={sevSeg} center={String(open.length)} sub="open" activeKey={filter.activeKey} onSelect={selectSev} />
         </ChartPanel>
-        <ChartPanel title="SLA position (open items)" span={4} filterLabel={chipFor('sla:')} onClearFilter={filter.clear}>
-          <HBarChart rows={slaRows} activeKey={filter.activeKey} onSelect={selectSla} />
-        </ChartPanel>
-        <ChartPanel title="By status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
-          <HBarChart rows={statusRows} activeKey={filter.activeKey} onSelect={selectStatus} />
+        <ChartPanel title="SLA runway — most urgent first" span={8}>
+          {runway.length === 0 ? (
+            <div style={{ padding: 18, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>No open vulnerabilities. 🎉</div>
+          ) : (
+            <div className="space-y-2.5">
+              {runway.map(({ v, left }) => {
+                const pct = (Math.min(60, Math.abs(left)) / runwayCap) * 50;
+                const tone = left < 0 ? 'crit' : left <= 7 ? 'med' : 'low';
+                return (
+                  <div key={v.id} className="flex items-center gap-3">
+                    <span className="w-44 shrink-0 truncate text-[11.5px]" title={`${v.id} — ${v.title}`} style={{ color: 'var(--text2)' }}>
+                      <b className="font-mono" style={{ color: `var(--${severityTone[v.severity]})` }}>{v.id}</b> {v.title}
+                    </span>
+                    <span className="relative flex-1 h-4 rounded-md" style={{ background: 'var(--surface3)' }}>
+                      <span className="absolute inset-y-0" style={{ left: '50%', width: 2, background: 'var(--text3)', opacity: 0.5 }} />
+                      <span
+                        className="absolute inset-y-0 rounded-sm"
+                        style={left < 0
+                          ? { right: '50%', width: `${pct}%`, background: 'var(--crit)' }
+                          : { left: '50%', width: `${Math.max(pct, 2)}%`, background: `var(--${tone})` }}
+                      />
+                    </span>
+                    <span className="w-16 text-right text-[11.5px] font-bold tabular-nums whitespace-nowrap" style={{ color: `var(--${tone})` }}>
+                      {left < 0 ? `${-left}d over` : `${left}d left`}
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="text-[10.5px] text-center pt-1" style={{ color: 'var(--text3)' }}>◀ past SLA&ensp;·&ensp;│ today&ensp;·&ensp;runway remaining ▶</div>
+            </div>
+          )}
         </ChartPanel>
       </ChartGrid>
 

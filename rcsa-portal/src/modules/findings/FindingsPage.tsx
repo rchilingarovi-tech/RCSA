@@ -118,14 +118,16 @@ export function FindingsPage() {
   const statusRows: BarRow[] = FINDING_STATUSES.map((s) => ({
     key: `st:${s}`, label: s, tone: statusTone[s] as Tone, value: findings.filter((f) => f.status === s).length,
   }));
-  const sourceRows: BarRow[] = FINDING_SOURCES.map((s) => ({
-    key: `src:${s}`, label: s, tone: sourceTone[s] as Tone, value: findings.filter((f) => f.source === s).length,
-  }));
 
   const selectSev = (key: string) => { const s = key.slice(4) as FindingSeverity; filter.select(key, s, (f) => f.severity === s && isOpenFinding(f)); };
   const selectStatus = (key: string) => { const s = key.slice(3) as FindingStatus; filter.select(key, s, (f) => f.status === s); };
-  const selectSource = (key: string) => { const s = key.slice(4) as FindingSource; filter.select(key, s, (f) => f.source === s); };
   const chipFor = (prefix: string) => (filter.active && filter.active.key.startsWith(prefix) ? filter.active.label : null);
+
+  // Signature widget: Source × Severity accountability matrix (open findings) —
+  // the grid a regulator asks for. Each cell click-filters the register.
+  const SHORT_SRC: Record<FindingSource, string> = { 'NBG Inspection': 'NBG', 'Internal Audit': 'Internal', 'External Audit': 'External', 'Self-identified': 'Self' };
+  const matrixCell = (src: FindingSource, sev: FindingSeverity) =>
+    findings.filter((f) => isOpenFinding(f) && f.source === src && f.severity === sev).length;
 
   const searched = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -167,8 +169,45 @@ export function FindingsPage() {
         <ChartPanel title="By status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <HBarChart rows={statusRows} activeKey={filter.activeKey} onSelect={selectStatus} />
         </ChartPanel>
-        <ChartPanel title="By source" span={4} filterLabel={chipFor('src:')} onClearFilter={filter.clear}>
-          <HBarChart rows={sourceRows} activeKey={filter.activeKey} onSelect={selectSource} />
+        <ChartPanel title="Source × severity matrix" span={4} filterLabel={chipFor('mx:')} onClearFilter={filter.clear}>
+          <div>
+            <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(4, 1fr)' }}>
+              <div />
+              {FINDING_SEVERITIES.map((sev) => (
+                <div key={sev} className="text-center text-[9.5px] font-bold uppercase tracking-wide pb-0.5" style={{ color: `var(--${severityTone[sev]})` }}>{sev === 'Critical' ? 'Crit' : sev}</div>
+              ))}
+              {FINDING_SOURCES.map((src) => (
+                <div key={src} className="contents">
+                  <div className="flex items-center justify-end pr-1.5 text-[11px] whitespace-nowrap" style={{ color: 'var(--text2)' }}>
+                    <span className="w-2 h-2 rounded-sm mr-1.5 shrink-0" style={{ background: `var(--${sourceTone[src]})` }} />{SHORT_SRC[src]}
+                  </div>
+                  {FINDING_SEVERITIES.map((sev) => {
+                    const n = matrixCell(src, sev);
+                    const key = `mx:${src}|${sev}`;
+                    const active = filter.activeKey === key;
+                    return (
+                      <button
+                        key={sev}
+                        onClick={() => filter.select(key, `${SHORT_SRC[src]} · ${sev}`, (f) => isOpenFinding(f) && f.source === src && f.severity === sev)}
+                        title={`${src} · ${sev}: ${n} open`}
+                        className="rounded-md py-2 text-[13px] font-bold tabular-nums transition-transform hover:scale-105"
+                        style={{
+                          background: n > 0 ? `var(--${severityTone[sev]})` : 'var(--surface3)',
+                          color: n > 0 ? '#fff' : 'var(--text3)',
+                          opacity: n > 0 ? 1 : 0.6,
+                          outline: active ? '2px solid var(--accent)' : 'none',
+                          outlineOffset: 1,
+                        }}
+                      >
+                        {n > 0 ? n : '·'}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <div className="text-[10.5px] mt-2 text-center" style={{ color: 'var(--text3)' }}>Open findings · click a cell to filter</div>
+          </div>
         </ChartPanel>
       </ChartGrid>
 

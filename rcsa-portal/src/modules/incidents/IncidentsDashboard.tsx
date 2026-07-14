@@ -5,6 +5,7 @@ import {
   CATEGORIES,
   severityColor,
   statusColor,
+  statusLabel,
   isOpen,
   timeToClosureDays,
   type Incident,
@@ -100,6 +101,44 @@ function AreaChart({ points }: { points: number[] }) {
 
 const KPI_COLOR = ['var(--high)', 'var(--crit)', 'var(--info)', 'var(--accent)'];
 
+// Signature widget: status pipeline board — a stage card per status with its
+// count and severity mix, so triage reads as a flow instead of a donut.
+function PipelineCard({ incidents }: { incidents: Incident[] }) {
+  return (
+    <div className="section-card p-5">
+      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Status pipeline</h3>
+      <p className="text-xs mb-3" style={{ color: 'var(--text3)' }}>Where incidents sit — severity mix per stage</p>
+      <div className="grid grid-cols-2 gap-3">
+        {INCIDENT_STATUSES.map((st) => {
+          const items = incidents.filter((i) => i.status === st);
+          const k = statusColor(st);
+          return (
+            <div key={st} className="rounded-xl p-3" style={{ border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: `var(--${k})` }} />
+                <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text3)' }}>{statusLabel(st)}</span>
+              </div>
+              <div className="tabular-nums text-[24px] font-bold mt-0.5" style={{ color: 'var(--text)' }}>{items.length}</div>
+              <div className="flex h-2 rounded-full overflow-hidden mt-1.5" style={{ background: 'var(--surface3)' }}>
+                {items.length > 0 && SEVERITIES.map((sv) => {
+                  const n = items.filter((i) => i.severity === sv).length;
+                  return n > 0 ? <span key={sv} title={`${n} ${sv}`} style={{ width: `${(n / items.length) * 100}%`, background: `var(--${severityColor(sv)})` }} /> : null;
+                })}
+              </div>
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1.5 min-h-[14px]">
+                {SEVERITIES.map((sv) => {
+                  const n = items.filter((i) => i.severity === sv).length;
+                  return n > 0 ? <span key={sv} className="text-[10px] font-semibold" style={{ color: `var(--${severityColor(sv)})` }}>{n} {sv === 'Critical' ? 'Crit' : sv}</span> : null;
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function IncidentsDashboard({ incidents }: { incidents: Incident[] }) {
   const kpis = useMemo(() => {
     const open = incidents.filter(isOpen).length;
@@ -118,14 +157,9 @@ export function IncidentsDashboard({ incidents }: { incidents: Incident[] }) {
   }, [incidents]);
 
   const total = incidents.length;
-  const closedCount = incidents.filter((i) => i.status === 'Closed').length;
 
   const severitySeg = useMemo<Seg[]>(
     () => SEVERITIES.map((s) => ({ label: s, value: incidents.filter((i) => i.severity === s).length, k: severityColor(s) })),
-    [incidents],
-  );
-  const statusSeg = useMemo<Seg[]>(
-    () => INCIDENT_STATUSES.map((s) => ({ label: s, value: incidents.filter((i) => i.status === s).length, k: statusColor(s) })),
     [incidents],
   );
   const categoryBars = useMemo(() => {
@@ -166,10 +200,10 @@ export function IncidentsDashboard({ incidents }: { incidents: Incident[] }) {
         ))}
       </div>
 
-      {/* Severity + Status donuts */}
+      {/* Severity donut + status pipeline board */}
       <div className="grid gap-4 md:grid-cols-2">
         <DonutCard title="By Severity" subtitle="Distribution across incidents in scope" segments={severitySeg} centerTop={String(total)} centerBottom="total" />
-        <DonutCard title="By Status" subtitle="Where incidents sit in the pipeline" segments={statusSeg} centerTop={total ? `${Math.round(closedCount / total * 100)}%` : '—'} centerBottom="closed" />
+        <PipelineCard incidents={incidents} />
       </div>
 
       {/* Category bars + Trend */}
