@@ -8,7 +8,6 @@ import { usePermissions } from '../../auth/usePermissions';
 import {
   ChartGrid,
   ChartPanel,
-  DonutChart,
   Sparkline,
   useChartFilter,
   type DonutSegment,
@@ -68,6 +67,59 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
   );
 }
 
+// RAG overview — a space-filling status visual (stacked health bar + progress
+// meters) that reads better than a small donut in this tall card. Click a row to
+// filter, exactly like the donut segments did.
+function RagOverview({ segments, total, activeKey, onSelect }: { segments: DonutSegment[]; total: number; activeKey: string | null; onSelect: (key: string) => void }) {
+  const onTrack = segments.find((s) => s.key === 'rag:low')?.value ?? 0;
+  const pct = total ? Math.round((onTrack / total) * 100) : 0;
+  const pctTone = pct >= 70 ? 'low' : pct >= 40 ? 'med' : 'crit';
+  const pctOf = (v: number) => (total ? Math.round((v / total) * 100) : 0);
+
+  return (
+    <div className="flex flex-col h-full gap-4">
+      <div className="flex items-end justify-between">
+        <div>
+          <div className="text-[34px] font-bold tabular-nums leading-none" style={{ color: 'var(--text)' }}>{total}</div>
+          <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>KPIs tracked</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[24px] font-bold tabular-nums leading-none" style={{ color: `var(--${pctTone})` }}>{pct}%</div>
+          <div className="text-[11px] mt-1" style={{ color: 'var(--text3)' }}>on track</div>
+        </div>
+      </div>
+
+      {/* Stacked health bar */}
+      <div className="h-3 rounded-full overflow-hidden flex" style={{ background: 'var(--surface3)' }}>
+        {segments.filter((s) => s.value > 0).map((s) => (
+          <span key={s.key} title={`${s.label}: ${s.value}`} style={{ width: `${pctOf(s.value)}%`, background: `var(--${s.tone})` }} />
+        ))}
+      </div>
+
+      {/* Progress meters — spread to fill the card height */}
+      <div className="flex-1 flex flex-col justify-center gap-3.5">
+        {segments.map((s) => {
+          const p = pctOf(s.value);
+          const active = activeKey === s.key;
+          return (
+            <button key={s.key} onClick={() => onSelect(s.key)} className="text-left group">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: `var(--${s.tone})` }} />
+                <span className="text-[13px]" style={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 700 : 500 }}>{s.label}</span>
+                <span className="ml-auto text-[15px] font-bold tabular-nums" style={{ color: 'var(--text)' }}>{s.value}</span>
+                <span className="text-[11px] tabular-nums w-9 text-right" style={{ color: 'var(--text3)' }}>{p}%</span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface3)', outline: active ? '2px solid var(--accent)' : 'none', outlineOffset: 1 }}>
+                <span className="block h-full rounded-full transition-all group-hover:brightness-95" style={{ width: `${Math.max(s.value > 0 ? 6 : 0, p)}%`, background: `var(--${s.tone})` }} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function KpisPage() {
   const ui = useUi();
   const perms = usePermissions('kpis');
@@ -123,7 +175,7 @@ export function KpisPage() {
 
       <ChartGrid>
         <ChartPanel title="RAG overview" span={4} filterLabel={chipFor('rag:')} onClearFilter={filter.clear}>
-          <DonutChart segments={ragSeg} center={String(kpis.length)} sub="KPIs" activeKey={filter.activeKey} onSelect={selectRag} />
+          <RagOverview segments={ragSeg} total={kpis.length} activeKey={filter.activeKey} onSelect={selectRag} />
         </ChartPanel>
         <ChartPanel title="Scorecard" span={8}>
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))' }}>
