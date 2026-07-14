@@ -7,6 +7,7 @@ import { vendorRepo } from '../vendors/repo';
 import { accessRepo } from '../access/repo';
 import { policyRepo } from '../policies/repo';
 import { awarenessRepo } from '../awareness/repo';
+import { findingsRepo } from '../findings/repo';
 import {
   agendaBuckets,
   buildCalendarEvents,
@@ -36,6 +37,7 @@ const readExternal = () => ({
   accessReviews: accessRepo.list(),
   policies: policyRepo.list(),
   courses: awarenessRepo.list(),
+  findings: findingsRepo.list(),
 });
 
 function relTime(d: Date): string {

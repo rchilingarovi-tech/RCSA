@@ -57,6 +57,7 @@ export const SEED_USERS: StoredUser[] = [
       'risk-catalogue': 'viewer',
       'asset-catalogue': 'viewer',
       compliance: 'viewer',
+      findings: 'viewer',
     },
     passwordHash: pw,
   },

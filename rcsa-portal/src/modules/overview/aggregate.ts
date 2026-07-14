@@ -27,6 +27,8 @@ import type { Course } from '../awareness/types';
 import { overdue as courseOverdue } from '../awareness/types';
 import type { ComplianceControl } from '../compliance/types';
 import { coverage } from '../compliance/types';
+import type { Finding } from '../findings/types';
+import { overdue as findingOverdue, overdueDays as findingOverdueDays, isOpenFinding } from '../findings/types';
 
 export type Level = 'Low' | 'Medium' | 'High' | 'Critical';
 
@@ -43,6 +45,7 @@ export interface OverviewData {
   meetings: Meeting[];
   courses: Course[];
   controls: ComplianceControl[];
+  findings: Finding[];
 }
 
 // ── Risk severity helpers ────────────────────────────────────────────────────
@@ -182,6 +185,21 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
         moduleId: 'risk-catalogue',
       }),
     );
+
+  // Overdue audit/regulator findings — Critical when the finding itself is
+  // Critical/High severity, otherwise High.
+  data.findings.filter(findingOverdue).forEach((f) =>
+    out.push({
+      id: `att-fnd-${f.id}`,
+      priority: f.severity === 'Critical' || f.severity === 'High' ? 'Critical' : 'High',
+      label: `${f.source}: ${f.title}`,
+      source: f.id,
+      owner: f.owner || '—',
+      due: f.dueDate,
+      overdueDays: findingOverdueDays(f),
+      moduleId: 'findings',
+    }),
+  );
 
   data.accessReviews.filter(accessOverdue).forEach((a) =>
     out.push({
@@ -400,6 +418,12 @@ export function buildUpcoming(data: OverviewData, horizonDays: number): Upcoming
     .filter((c) => c.completion < 100 && c.due)
     .forEach((c) =>
       push({ id: `up-trn-${c.id}`, icon: 'grad', title: c.course, subtext: `${c.audience} · ${c.completion}% done`, date: c.due, moduleId: 'awareness' }),
+    );
+
+  data.findings
+    .filter((f) => isOpenFinding(f) && f.dueDate)
+    .forEach((f) =>
+      push({ id: `up-fnd-${f.id}`, icon: 'edit', title: `Finding: ${f.title}`, subtext: `${f.source} · ${f.owner || 'Unassigned'}`, date: f.dueDate, moduleId: 'findings' }),
     );
 
   return items.sort((a, b) => a.days - b.days);

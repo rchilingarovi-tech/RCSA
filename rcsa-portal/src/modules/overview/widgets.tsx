@@ -23,6 +23,7 @@ const MODULE_ICON: Record<string, string> = {
   policies: 'doc',
   kpis: 'chart',
   awareness: 'grad',
+  findings: 'edit',
 };
 
 const fmtDate = (iso: string): string => {

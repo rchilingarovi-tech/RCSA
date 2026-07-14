@@ -12,6 +12,8 @@ import { awarenessRepo } from '../../modules/awareness/repo';
 import { overdue as awarenessOverdue } from '../../modules/awareness/types';
 import { kpiRepo } from '../../modules/kpis/repo';
 import { rag } from '../../modules/kpis/types';
+import { findingsRepo } from '../../modules/findings/repo';
+import { overdue as findingOverdue } from '../../modules/findings/types';
 
 export interface AppNotification {
   id: string;
@@ -50,6 +52,9 @@ export function buildNotifications(treatments: Treatment[]): AppNotification[] {
 
   const kpisOff = kpiRepo.list().filter((kp) => rag(kp) === 'crit').length;
   if (kpisOff) out.push({ id: 'kpi-off', moduleId: 'kpis', icon: 'chart', k: 'high', title: 'KPIs off track', body: `${plural(kpisOff, 'metric')} below target.` });
+
+  const findingsLate = findingsRepo.list().filter(findingOverdue).length;
+  if (findingsLate) out.push({ id: 'fnd-overdue', moduleId: 'findings', icon: 'edit', k: 'crit', title: 'Audit findings overdue', body: `${plural(findingsLate, 'finding')} past their remediation deadline.` });
 
   return out;
 }

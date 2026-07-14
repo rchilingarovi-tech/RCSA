@@ -12,6 +12,7 @@ import { kpiRepo } from '../kpis/repo';
 import { committeeRepo } from '../committee/repo';
 import { awarenessRepo } from '../awareness/repo';
 import { complianceRepo } from '../compliance/repo';
+import { findingsRepo } from '../findings/repo';
 import {
   buildAttentionItems,
   buildUpcoming,
@@ -120,6 +121,7 @@ export function OverviewPage() {
       meetings: committeeRepo.list(),
       courses: awarenessRepo.list(),
       controls: complianceRepo.list(),
+      findings: findingsRepo.list(),
     }),
     [],
   );

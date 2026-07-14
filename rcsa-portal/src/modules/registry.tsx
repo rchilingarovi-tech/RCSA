@@ -6,6 +6,7 @@ import { AssetCataloguePage } from './rcsa/AssetCataloguePage';
 import { RiskCataloguePage } from './rcsa/RiskCataloguePage';
 import { TreatmentCataloguePage } from './rcsa/TreatmentCataloguePage';
 import { CompliancePage } from './compliance/CompliancePage';
+import { FindingsPage } from './findings/FindingsPage';
 import { KpisPage } from './kpis/KpisPage';
 import { VendorsPage } from './vendors/VendorsPage';
 import { PoliciesPage } from './policies/PoliciesPage';
@@ -107,6 +108,15 @@ export const MODULES: ModuleDef[] = [
     status: 'active',
     description: 'Multi-framework control assessment with coverage and gap analysis.',
     Component: CompliancePage,
+  },
+  {
+    id: 'findings',
+    label: 'Audit Findings',
+    icon: 'edit',
+    group: 'Risk & Compliance',
+    status: 'active',
+    description: 'Regulator / audit findings register with remediation owners and deadlines.',
+    Component: FindingsPage,
   },
   {
     id: 'vendors',

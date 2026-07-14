@@ -9,6 +9,7 @@ import type { Vendor } from '../vendors/types';
 import type { AccessReview } from '../access/types';
 import type { PolicyDoc } from '../policies/types';
 import type { Course } from '../awareness/types';
+import type { Finding } from '../findings/types';
 
 export type LayerKey = 'risk' | 'vendor' | 'compliance' | 'awareness';
 export type EventStatus = 'Overdue' | 'Upcoming' | 'Done';
@@ -52,6 +53,7 @@ export interface CalData {
   accessReviews: AccessReview[];
   policies: PolicyDoc[];
   courses: Course[];
+  findings: Finding[];
 }
 
 const daysBetween = (fromIso: string, toIso: string): number =>
@@ -161,6 +163,22 @@ export function buildCalendarEvents(d: CalData): CalEvent[] {
       type: 'Training Campaign',
       description: `${c.method} · ${c.completion}% complete`,
       done: c.completion >= 100,
+    }),
+  );
+
+  d.findings.forEach((f) =>
+    add({
+      id: f.id,
+      title: f.title,
+      date: f.dueDate,
+      layer: 'compliance',
+      source: 'Audit & Findings Register',
+      moduleId: 'findings',
+      owner: f.owner || '—',
+      criticality: f.severity,
+      type: 'Audit Finding',
+      description: `${f.source}${f.ref ? ` · ${f.ref}` : ''} · ${f.status}`,
+      done: f.status === 'Closed',
     }),
   );
 
