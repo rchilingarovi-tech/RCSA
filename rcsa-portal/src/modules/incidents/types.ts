@@ -50,6 +50,18 @@ export function statusColor(s: IncidentStatus): string {
   return s === 'Closed' ? 'low' : s === 'In Progress' ? 'info' : s === 'Pending' ? 'med' : 'high';
 }
 
+/** Display label for a status — clarifies the ambiguous 'Pending'. */
+export const statusLabel = (s: IncidentStatus): string => (s === 'Pending' ? 'Pending – external' : s);
+
+/** Whole days an incident has been open since it was reported; null when closed
+ *  or the date is invalid. Computed per call so long-lived tabs stay accurate. */
+export function daysOpen(i: Pick<Incident, 'status' | 'reportedAt'>): number | null {
+  if (i.status === 'Closed') return null;
+  const start = new Date(i.reportedAt).getTime();
+  if (Number.isNaN(start)) return null;
+  return Math.max(0, Math.floor((Date.now() - start) / 86400000));
+}
+
 export const SEVERITY_RANK: Record<Severity, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
 export const isOpen = (i: Incident): boolean => i.status !== 'Closed';

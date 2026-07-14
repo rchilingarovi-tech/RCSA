@@ -7,7 +7,9 @@ import {
   SEVERITY_RANK,
   severityColor,
   statusColor,
+  statusLabel,
   categoryLabel,
+  daysOpen,
   type Incident,
 } from './types';
 
@@ -82,7 +84,18 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
                   <td className="px-3 py-3 text-sm max-w-[160px] truncate hidden sm:table-cell" title={categoryLabel(i)}>{categoryLabel(i)}</td>
                   <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap hidden md:table-cell">{fmtDateTime(i.reportedAt)}</td>
                   <td className="px-3 py-3"><Pill text={i.severity} k={severityColor(i.severity)} /></td>
-                  <td className="px-3 py-3"><Pill text={i.status} k={statusColor(i.status)} /></td>
+                  <td className="px-3 py-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Pill text={statusLabel(i.status)} k={statusColor(i.status)} />
+                      {(() => {
+                        // Aging chip — surfaces the oldest open incidents for faster triage.
+                        const age = daysOpen(i);
+                        if (age == null || age < 7) return null;
+                        const k = age >= 30 ? 'crit' : 'med';
+                        return <span title={`Open ${age} days`} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: `var(--${k}-bg)`, color: `var(--${k})` }}>{age}d</span>;
+                      })()}
+                    </span>
+                  </td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2 text-xs">
                       <button onClick={() => onView(i)} className="text-blue-600 hover:underline">View</button>

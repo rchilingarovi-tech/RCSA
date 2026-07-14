@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Drawer } from '../../components/layout/Drawer';
 import { Pill } from '../../components/common/Pill';
 import { Icon } from '../../components/common/Icon';
@@ -10,7 +10,7 @@ import { IncidentsDashboard } from './IncidentsDashboard';
 import { IncidentList } from './IncidentList';
 import { IncidentFilters } from './IncidentFilters';
 import { IncidentModal } from './IncidentModal';
-import { categoryLabel, severityColor, statusColor, timeToClosureDays, filterIncidents, EMPTY_INCIDENT_FILTER, type Incident, type IncidentFilter } from './types';
+import { categoryLabel, severityColor, statusColor, statusLabel, timeToClosureDays, filterIncidents, EMPTY_INCIDENT_FILTER, type Incident, type IncidentFilter } from './types';
 
 const fmtDateTime = (s: string) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(); };
 const fmtDate = (s: string) => (s ? new Date(s).toLocaleDateString() : '—');
@@ -31,6 +31,16 @@ export function IncidentsPage() {
   const [filter, setFilter] = useState<IncidentFilter>(EMPTY_INCIDENT_FILTER);
   const [editing, setEditing] = useState<Incident | 'new' | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Multi-tab safety: when another tab writes the incidents store, re-read it so
+  // this tab never saves from (or renders) a stale copy (lost-update guard).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.incidents.v1') setIncidents(incidentRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const filtered = useMemo(() => filterIncidents(incidents, filter), [incidents, filter]);
   const responsibleOptions = useMemo(() => [...new Set(incidents.map((i) => i.responsible).filter(Boolean))].sort(), [incidents]);
@@ -76,7 +86,7 @@ export function IncidentsPage() {
           <div className="p-5 space-y-4">
             <div className="flex gap-2">
               <Pill text={selected.severity} k={severityColor(selected.severity)} />
-              <Pill text={selected.status} k={statusColor(selected.status)} />
+              <Pill text={statusLabel(selected.status)} k={statusColor(selected.status)} />
             </div>
             <div>
               <DetailRow label="Time reported" value={fmtDateTime(selected.reportedAt)} />

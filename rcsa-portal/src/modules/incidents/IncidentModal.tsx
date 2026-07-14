@@ -41,6 +41,10 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
     if (occurredAt && reportedAt && occurredAt > reportedAt) { ui.toast('Incident time cannot be after the time reported.', 'bg-orange-600'); return; }
     // Closure date is only meaningful when Closed; auto-fill / clear accordingly.
     const resolvedClosedAt = status === 'Closed' ? (closedAt || todayStr()) : '';
+    // A closure before the report date would silently corrupt time-to-closure stats.
+    if (resolvedClosedAt && reportedAt && resolvedClosedAt < reportedAt.slice(0, 10)) {
+      ui.toast('Closure date cannot be before the time reported.', 'bg-orange-600'); return;
+    }
 
     onSave({
       id: e ? e.id : incidentRepo.nextId(),
@@ -67,13 +71,13 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
   return (
     <Modal open onClose={onClose} title={e ? `Edit Incident — ${e.id}` : 'Report New Incident'} subtitle="Security incident record" maxWidth="max-w-2xl">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Short description *</label><input value={shortDesc} onChange={(ev) => setShortDesc(ev.target.value)} className={field} placeholder="e.g. Phishing campaign targeting finance team" /></div>
+        <div><label className={lbl}>Short description *</label><input value={shortDesc} maxLength={200} onChange={(ev) => setShortDesc(ev.target.value)} className={field} placeholder="e.g. Phishing campaign targeting finance team" /></div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={lbl}>Time reported</label><input type="datetime-local" value={reportedAt} onChange={(ev) => setReportedAt(ev.target.value)} className={field} /></div>
           <div><label className={lbl}>Incident time (when it happened)</label><input type="datetime-local" value={occurredAt} onChange={(ev) => setOccurredAt(ev.target.value)} className={field} /></div>
-          <div><label className={lbl}>Reported by *</label><input value={reportedBy} onChange={(ev) => setReportedBy(ev.target.value)} className={field} placeholder="Person / source" /></div>
-          <div><label className={lbl}>Responsible person</label><input value={responsible} onChange={(ev) => setResponsible(ev.target.value)} className={field} placeholder="Handler / owner" /></div>
+          <div><label className={lbl}>Reported by *</label><input value={reportedBy} maxLength={120} onChange={(ev) => setReportedBy(ev.target.value)} className={field} placeholder="Person / source" /></div>
+          <div><label className={lbl}>Responsible person</label><input value={responsible} maxLength={120} onChange={(ev) => setResponsible(ev.target.value)} className={field} placeholder="Handler / owner" /></div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -96,15 +100,15 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
         </div>
 
         {category === 'Other' && (
-          <div><label className={lbl}>Specify category</label><input value={categoryOther} onChange={(ev) => setCategoryOther(ev.target.value)} className={field} placeholder="Describe the incident category" /></div>
+          <div><label className={lbl}>Specify category</label><input value={categoryOther} maxLength={120} onChange={(ev) => setCategoryOther(ev.target.value)} className={field} placeholder="Describe the incident category" /></div>
         )}
 
-        <div><label className={lbl}>Affected asset / system</label><input value={asset} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Email Gateway, Server SRV-09" /></div>
-        <div><label className={lbl}>Description</label><textarea value={description} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What happened, impact, actions taken…" /></div>
+        <div><label className={lbl}>Affected asset / system</label><input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Email Gateway, Server SRV-09" /></div>
+        <div><label className={lbl}>Description</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What happened, impact, actions taken…" /></div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label className={lbl}>Root cause</label><textarea value={rootCause} onChange={(ev) => setRootCause(ev.target.value)} className={field} rows={3} placeholder="Underlying cause (post-investigation)" /></div>
-          <div><label className={lbl}>Corrective action</label><textarea value={correctiveAction} onChange={(ev) => setCorrectiveAction(ev.target.value)} className={field} rows={3} placeholder="Remedial / corrective action taken" /></div>
+          <div><label className={lbl}>Root cause</label><textarea value={rootCause} maxLength={2000} onChange={(ev) => setRootCause(ev.target.value)} className={field} rows={3} placeholder="Underlying cause (post-investigation)" /></div>
+          <div><label className={lbl}>Corrective action</label><textarea value={correctiveAction} maxLength={2000} onChange={(ev) => setCorrectiveAction(ev.target.value)} className={field} rows={3} placeholder="Remedial / corrective action taken" /></div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
