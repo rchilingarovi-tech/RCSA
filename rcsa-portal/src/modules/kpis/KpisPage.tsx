@@ -49,7 +49,7 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit KPI — ${e.id}` : 'New KPI'} subtitle="Performance metric" maxWidth="max-w-xl">
+    <Modal open onClose={onClose} title={e ? `Edit KPI — ${e.id}` : 'New KPI'} subtitle="Performance metric" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
         <div><label className={lbl}>Name *</label><input value={name} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Mean time to contain" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

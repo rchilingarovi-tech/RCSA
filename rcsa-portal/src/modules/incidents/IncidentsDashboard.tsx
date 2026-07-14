@@ -154,7 +154,7 @@ export function IncidentsDashboard({ incidents }: { incidents: Incident[] }) {
   return (
     <div className="space-y-4">
       {/* KPI cards */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))' }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
         {kpis.map((k, i) => (
           <div key={k.label} className="section-card relative overflow-hidden p-4">
             <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: KPI_COLOR[i] }} />

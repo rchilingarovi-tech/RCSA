@@ -102,7 +102,7 @@ export function AssetCataloguePage() {
   return (
     <div className="p-6 space-y-4">
       {/* Stat strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))' }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
         {stats.map((s) => (
           <div key={s.l} className="section-card p-4">
             <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>

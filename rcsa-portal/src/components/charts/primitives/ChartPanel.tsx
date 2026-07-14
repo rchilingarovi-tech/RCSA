@@ -23,8 +23,11 @@ interface PanelProps {
 }
 
 export function ChartPanel({ title, span = 4, filterLabel, onClearFilter, children }: PanelProps) {
+  // h-full + stretch (grid default) → every panel in a row is the same height.
+  // The content area flexes and centers so short charts fill the space instead of
+  // leaving dead whitespace at the bottom.
   return (
-    <div className={`section-card p-4 ${SPAN[span]}`}>
+    <div className={`section-card p-4 flex flex-col h-full ${SPAN[span]}`}>
       <div className="flex items-center gap-2 mb-3">
         <h3 className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>{title}</h3>
         {filterLabel && (
@@ -37,7 +40,7 @@ export function ChartPanel({ title, span = 4, filterLabel, onClearFilter, childr
           </button>
         )}
       </div>
-      {children}
+      <div className="flex-1 flex flex-col justify-center">{children}</div>
     </div>
   );
 }
