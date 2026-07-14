@@ -2,7 +2,13 @@
 // UTF-8 BOM so Excel opens it cleanly). New shared util — not used by the
 // protected modules, which keep their own exporters.
 export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]): void {
-  const esc = (v: string | number) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const esc = (v: string | number) => {
+    let s = String(v ?? '');
+    // Neutralize spreadsheet formula injection: Excel/Sheets execute cells
+    // starting with = + - @ (and tab/CR variants). Prefix with ' to force text.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return `"${s.replaceAll('"', '""')}"`;
+  };
   const csv = [headers, ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

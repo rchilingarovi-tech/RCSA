@@ -4,9 +4,15 @@ import { assetValue, criticality, riskLevel, residualScore, riskStatus, treatmen
 // CSV export — ported from New Version.html L560-591.
 
 function downloadCsv(filename: string, rows: (string | number)[][]): void {
-  const csv = rows
-    .map((r) => r.map((v) => `"${String(v ?? '').replaceAll('"', '""')}"`).join(','))
-    .join('\n');
+  // Neutralize spreadsheet formula injection (cells starting = + - @ / tab / CR
+  // execute in Excel/Sheets): prefix with ' to force text. Output changes only
+  // for hostile-shaped input.
+  const esc = (v: string | number) => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return `"${s.replaceAll('"', '""')}"`;
+  };
+  const csv = rows.map((r) => r.map(esc).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
