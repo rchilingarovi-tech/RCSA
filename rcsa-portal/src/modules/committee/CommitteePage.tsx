@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { meetingIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,7 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
 import { today } from '../../domain/scoring';
 import { committeeRepo } from './repo';
 import { MEETING_STATUSES, statusToken, type Meeting, type MeetingStatus } from './types';
@@ -93,12 +94,6 @@ export function CommitteePage() {
   const del = (m: Meeting) => ui.confirm(`Delete "${m.title}"?`, 'This cannot be undone.', () => { setMeetings(committeeRepo.remove(m.id)); ui.toast('Meeting deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample meetings and discards your changes.', () => { setMeetings(committeeRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `committee-meetings-${today()}.csv`,
-    ['ID', 'Title', 'Date', 'Status', 'Open actions', 'Attendance', 'Decisions'],
-    rows.map((m) => [m.id, m.title, m.date, m.status, m.openActions, m.attendance, m.decisions]),
-  );
-
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Meetings logged', v: meetings.length },
     { l: 'Upcoming', v: meetings.filter((m) => m.status === 'Scheduled').length, t: 'info' },
@@ -130,7 +125,7 @@ export function CommitteePage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search meetings…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={meetingIo} exportSource={rows} existing={meetings} canImport={perms.create} canExport={perms.export} onImported={(items) => setMeetings(committeeRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Meeting</button>}
       </div>

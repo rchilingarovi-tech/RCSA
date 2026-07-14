@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { vendorIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,7 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
 import { today } from '../../domain/scoring';
 import { vendorRepo } from './repo';
 import {
@@ -134,12 +135,6 @@ export function VendorsPage() {
   const del = (v: Vendor) => ui.confirm(`Delete "${v.name}"?`, 'This cannot be undone.', () => { setVendors(vendorRepo.remove(v.id)); ui.toast('Vendor deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vendors and discards your changes.', () => { setVendors(vendorRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `vendors-${today()}.csv`,
-    ['ID', 'Name', 'Criticality', 'Data access', 'Residual score', 'Band', 'Contract expiry', 'Certifications'],
-    rows.map((v) => [v.id, v.name, v.criticality, v.dataAccess, v.score, scoreBand(v.score).label, v.contractExpiry, v.certs.join('; ')]),
-  );
-
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Vendors', v: vendors.length },
     { l: 'Critical', v: vendors.filter((v) => v.criticality === 'Critical').length, t: 'crit' },
@@ -177,7 +172,7 @@ export function VendorsPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search vendors…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={vendorIo} exportSource={rows} existing={vendors} canImport={perms.create} canExport={perms.export} onImported={(items) => setVendors(vendorRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Vendor</button>}
       </div>

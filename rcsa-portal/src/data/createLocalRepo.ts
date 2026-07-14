@@ -11,6 +11,8 @@ function clone<T>(v: T): T {
 export interface LocalRepo<T> {
   list(): T[];
   save(item: T): T[];
+  /** Upsert many in ONE write with ONE summarizing audit event (CSV import). */
+  bulkSave(items: T[]): T[];
   remove(id: string): T[];
   reset(): T[];
   /** Next sequential id, e.g. "CTL-001", derived from the current set. */
@@ -80,6 +82,24 @@ export function createLocalRepo<T extends { id: string }>(opts: {
         entityId: item.id,
         summary: `${isNew ? 'Created' : 'Updated'} ${label(item)}`,
         changes,
+      });
+      return all;
+    },
+    bulkSave(items: T[]): T[] {
+      if (items.length === 0) return read();
+      const all = read();
+      let created = 0;
+      let updated = 0;
+      items.forEach((item) => {
+        const idx = all.findIndex((x) => x.id === item.id);
+        if (idx === -1) { all.push(item); created += 1; }
+        else { all[idx] = item; updated += 1; }
+      });
+      write(all);
+      auditLog.record({
+        action: updated === 0 ? 'create' : 'update',
+        entity,
+        summary: `Imported ${items.length} ${entity}${items.length === 1 ? '' : 's'} from CSV (${created} new, ${updated} updated)`,
       });
       return all;
     },

@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { vulnIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,8 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
-import { today } from '../../domain/scoring';
 import { vulnRepo } from './repo';
 import {
   SLA_DAYS,
@@ -174,12 +174,6 @@ export function VulnsPage() {
   const del = (v: Vuln) => ui.confirm(`Delete "${v.id}"?`, 'This cannot be undone.', () => { setVulns(vulnRepo.remove(v.id)); ui.toast('Vulnerability deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vulnerabilities and discards your changes.', () => { setVulns(vulnRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `vulnerabilities-${today()}.csv`,
-    ['ID', 'Title', 'Source', 'Reference', 'Asset', 'Severity', 'CVSS', 'Discovered', 'SLA Deadline', 'Days Left', 'Owner', 'Status'],
-    rows.map((v) => [v.id, v.title, v.source, v.ref, v.asset, v.severity, v.cvss, v.discovered, slaDeadline(v), slaDaysLeft(v) ?? '', v.owner, v.status]),
-  );
-
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Vulnerabilities', v: vulns.length },
     { l: 'Open', v: open.length, t: 'high' },
@@ -217,7 +211,7 @@ export function VulnsPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search vulnerabilities…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={vulnIo} exportSource={rows} existing={vulns} canImport={perms.create} canExport={perms.export} onImported={(items) => setVulns(vulnRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Vulnerability</button>}
       </div>

@@ -5,6 +5,8 @@ import { Icon } from '../../components/common/Icon';
 import { PageHeader } from '../rcsa/PageHeader';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { incidentIo } from './io';
 import { incidentRepo } from './repo';
 import { IncidentsDashboard } from './IncidentsDashboard';
 import { IncidentList } from './IncidentList';
@@ -56,6 +58,7 @@ export function IncidentsPage() {
   return (
     <>
       <PageHeader>
+        <ImportExport spec={incidentIo} exportSource={filtered} existing={incidents} canImport={perms.create} canExport={perms.export} onImported={(items) => setIncidents(incidentRepo.bulkSave(items))} />
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow">+ Report Incident</button>}
         {perms.remove && (
           <button

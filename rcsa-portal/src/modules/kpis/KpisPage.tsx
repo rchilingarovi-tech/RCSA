@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { kpiIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -13,8 +15,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
-import { today } from '../../domain/scoring';
 import { kpiRepo } from './repo';
 import { DIRECTIONS, attainment, parseHistory, rag, ragLabel, type Direction, type Kpi, type Rag } from './types';
 
@@ -149,12 +149,6 @@ export function KpisPage() {
   const del = (k: Kpi) => ui.confirm(`Delete "${k.name}"?`, 'This cannot be undone.', () => { setKpis(kpiRepo.remove(k.id)); ui.toast('KPI deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample KPIs and discards your changes.', () => { setKpis(kpiRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `kpis-${today()}.csv`,
-    ['ID', 'Name', 'Target', 'Current', 'Unit', 'Direction', 'RAG', 'History'],
-    rows.map((k) => [k.id, k.name, k.target, k.current, k.unit, k.direction, ragLabel(rag(k)), k.history]),
-  );
-
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'KPIs tracked', v: kpis.length },
     { l: 'On track', v: kpis.filter((k) => rag(k) === 'low').length, t: 'low' },
@@ -204,7 +198,7 @@ export function KpisPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search KPIs…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={kpiIo} exportSource={rows} existing={kpis} canImport={perms.create} canExport={perms.export} onImported={(items) => setKpis(kpiRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New KPI</button>}
       </div>

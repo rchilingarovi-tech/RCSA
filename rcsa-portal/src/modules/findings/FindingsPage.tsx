@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { findingIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,8 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
-import { today } from '../../domain/scoring';
 import { findingsRepo } from './repo';
 import {
   FINDING_SEVERITIES,
@@ -139,12 +139,6 @@ export function FindingsPage() {
   const del = (f: Finding) => ui.confirm(`Delete "${f.id}"?`, 'This cannot be undone.', () => { setFindings(findingsRepo.remove(f.id)); ui.toast('Finding deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample findings and discards your changes.', () => { setFindings(findingsRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `audit-findings-${today()}.csv`,
-    ['ID', 'Title', 'Source', 'Reference', 'Severity', 'Owner', 'Due Date', 'Status', 'Overdue Days'],
-    rows.map((f) => [f.id, f.title, f.source, f.ref, f.severity, f.owner, f.dueDate, f.status, overdueDays(f)]),
-  );
-
   const open = findings.filter(isOpenFinding);
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Findings', v: findings.length },
@@ -183,7 +177,7 @@ export function FindingsPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search findings…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={findingIo} exportSource={rows} existing={findings} canImport={perms.create} canExport={perms.export} onImported={(items) => setFindings(findingsRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Finding</button>}
       </div>

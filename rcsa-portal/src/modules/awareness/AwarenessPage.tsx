@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { courseIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,7 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
 import { today } from '../../domain/scoring';
 import { awarenessRepo } from './repo';
 import { COURSE_TYPES, METHODS, overdue, typeToken, type Course, type CourseType, type Method } from './types';
@@ -93,12 +94,6 @@ export function AwarenessPage() {
   const del = (c: Course) => ui.confirm(`Delete "${c.course}"?`, 'This cannot be undone.', () => { setCourses(awarenessRepo.remove(c.id)); ui.toast('Course deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample courses and discards your changes.', () => { setCourses(awarenessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `awareness-${today()}.csv`,
-    ['ID', 'Course', 'Type', 'Audience', 'Method', 'Due', 'Completion %'],
-    rows.map((c) => [c.id, c.course, c.type, c.audience, c.method, c.due, c.completion]),
-  );
-
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Active items', v: courses.length },
     { l: 'Avg completion', v: `${avg}%`, t: 'ok' },
@@ -130,7 +125,7 @@ export function AwarenessPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={courseIo} exportSource={rows} existing={courses} canImport={perms.create} canExport={perms.export} onImported={(items) => setCourses(awarenessRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Course</button>}
       </div>

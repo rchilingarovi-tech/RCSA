@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { accessIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,7 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
 import { today } from '../../domain/scoring';
 import { accessRepo } from './repo';
 import { overdue, type AccessReview } from './types';
@@ -94,12 +95,6 @@ export function AccessPage() {
   const del = (r: AccessReview) => ui.confirm(`Delete "${r.campaign}"?`, 'This cannot be undone.', () => { setReviews(accessRepo.remove(r.id)); ui.toast('Campaign deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample campaigns and discards your changes.', () => { setReviews(accessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `access-reviews-${today()}.csv`,
-    ['ID', 'Campaign', 'Scope', 'Period', 'Reviewer', 'Due', 'Progress %'],
-    rows.map((r) => [r.id, r.campaign, r.scope, r.period, r.reviewer, r.due, r.progress]),
-  );
-
   const avg = reviews.length ? Math.round(reviews.reduce((s, r) => s + (Number(r.progress) || 0), 0) / reviews.length) : 0;
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Campaigns', v: reviews.length },
@@ -132,7 +127,7 @@ export function AccessPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search campaigns…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={accessIo} exportSource={rows} existing={reviews} canImport={perms.create} canExport={perms.export} onImported={(items) => setReviews(accessRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Campaign</button>}
       </div>

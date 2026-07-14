@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { policyIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,7 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
 import { today } from '../../domain/scoring';
 import { policyRepo } from './repo';
 import { DOC_STATUSES, DOC_TYPES, statusToken, typeToken, type DocStatus, type DocType, type PolicyDoc } from './types';
@@ -100,12 +101,6 @@ export function PoliciesPage() {
   const del = (d: PolicyDoc) => ui.confirm(`Delete "${d.title}"?`, 'This cannot be undone.', () => { setDocs(policyRepo.remove(d.id)); ui.toast('Document deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample documents and discards your changes.', () => { setDocs(policyRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `documents-${today()}.csv`,
-    ['ID', 'Title', 'Type', 'Version', 'Status', 'Owner', 'Next review'],
-    rows.map((d) => [d.id, d.title, d.type, d.version, d.status, d.owner, d.nextReview]),
-  );
-
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Documents', v: docs.length },
     { l: 'Approved', v: docs.filter((d) => d.status === 'Approved').length, t: 'low' },
@@ -140,7 +135,7 @@ export function PoliciesPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search documents…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={policyIo} exportSource={rows} existing={docs} canImport={perms.create} canExport={perms.export} onImported={(items) => setDocs(policyRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Document</button>}
       </div>

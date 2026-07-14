@@ -5,6 +5,8 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
+import { ImportExport } from '../../components/common/ImportExport';
+import { planIo } from './io';
 import {
   ChartGrid,
   ChartPanel,
@@ -15,8 +17,6 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { downloadCsv } from '../../lib/csv';
-import { today } from '../../domain/scoring';
 import { planRepo } from './repo';
 import { CATEGORIES, PRIORITIES, QUARTERS, priorityToken, type Initiative, type PlanCategory, type Priority, type Quarter } from './types';
 
@@ -98,12 +98,6 @@ export function PlanPage() {
   const del = (i: Initiative) => ui.confirm(`Delete "${i.initiative}"?`, 'This cannot be undone.', () => { setItems(planRepo.remove(i.id)); ui.toast('Initiative deleted', 'bg-red-700'); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample initiatives and discards your changes.', () => { setItems(planRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
 
-  const exportCsv = () => downloadCsv(
-    `yearly-plan-${today()}.csv`,
-    ['ID', 'Initiative', 'Category', 'Quarter', 'Owner', 'Priority', 'Progress %'],
-    rows.map((i) => [i.id, i.initiative, i.category, i.quarter, i.owner, i.priority, i.progress]),
-  );
-
   const avgAll = items.length ? Math.round(items.reduce((s, i) => s + (Number(i.progress) || 0), 0) / items.length) : 0;
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Initiatives', v: items.length },
@@ -139,7 +133,7 @@ export function PlanPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search initiatives…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        {perms.export && <button onClick={exportCsv} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Export CSV</button>}
+        <ImportExport spec={planIo} exportSource={rows} existing={items} canImport={perms.create} canExport={perms.export} onImported={(items) => setItems(planRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Initiative</button>}
       </div>
