@@ -5,6 +5,7 @@ import { grantsStore } from './grantsStore';
 import { hashPassword, verifyPassword } from './passwordPolicy';
 import { resolveAccess, type AppUser, type GrantMap, type Role, type Session, type StoredUser } from './types';
 import { auditLog, diffFields } from '../audit/auditLog';
+import { UPN_DOMAIN } from '../config';
 
 // The identity + rights seam. Today it authenticates against a local user store
 // (demo). After migration this is the ONLY place that changes — it will obtain the
@@ -143,11 +144,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createUser: (input, password) => {
         const user: StoredUser = {
           id: userStore.nextId(),
-          upn: `${input.sAMAccountName}@lb.ge`,
+          upn: `${input.sAMAccountName}@${UPN_DOMAIN}`,
           sAMAccountName: input.sAMAccountName,
           displayName: input.displayName,
           title: input.title,
-          email: input.email || `${input.sAMAccountName}@lb.ge`,
+          email: input.email || `${input.sAMAccountName}@${UPN_DOMAIN}`,
           groups: input.groups,
           isAdmin: input.isAdmin,
           active: true,
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser: (id, input) => {
         const u = userStore.get(id);
         if (!u) return;
-        const updated: StoredUser = { ...u, ...input, upn: `${input.sAMAccountName}@lb.ge`, email: input.email || `${input.sAMAccountName}@lb.ge` };
+        const updated: StoredUser = { ...u, ...input, upn: `${input.sAMAccountName}@${UPN_DOMAIN}`, email: input.email || `${input.sAMAccountName}@${UPN_DOMAIN}` };
         userStore.save(updated);
         audit('update', 'User', id, `Updated user ${updated.displayName}`, diffFields(u as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>));
         setTick((t) => t + 1);
