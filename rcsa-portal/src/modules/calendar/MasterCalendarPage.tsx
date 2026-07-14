@@ -8,6 +8,7 @@ import { accessRepo } from '../access/repo';
 import { policyRepo } from '../policies/repo';
 import { awarenessRepo } from '../awareness/repo';
 import { findingsRepo } from '../findings/repo';
+import { vulnRepo } from '../vulns/repo';
 import {
   agendaBuckets,
   buildCalendarEvents,
@@ -38,6 +39,7 @@ const readExternal = () => ({
   policies: policyRepo.list(),
   courses: awarenessRepo.list(),
   findings: findingsRepo.list(),
+  vulns: vulnRepo.list(),
 });
 
 function relTime(d: Date): string {

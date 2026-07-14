@@ -14,6 +14,8 @@ import { kpiRepo } from '../../modules/kpis/repo';
 import { rag } from '../../modules/kpis/types';
 import { findingsRepo } from '../../modules/findings/repo';
 import { overdue as findingOverdue } from '../../modules/findings/types';
+import { vulnRepo } from '../../modules/vulns/repo';
+import { slaBreached } from '../../modules/vulns/types';
 
 export interface AppNotification {
   id: string;
@@ -55,6 +57,9 @@ export function buildNotifications(treatments: Treatment[]): AppNotification[] {
 
   const findingsLate = findingsRepo.list().filter(findingOverdue).length;
   if (findingsLate) out.push({ id: 'fnd-overdue', moduleId: 'findings', icon: 'edit', k: 'crit', title: 'Audit findings overdue', body: `${plural(findingsLate, 'finding')} past their remediation deadline.` });
+
+  const vulnsBreached = vulnRepo.list().filter(slaBreached).length;
+  if (vulnsBreached) out.push({ id: 'vul-sla', moduleId: 'vulns', icon: 'alert', k: 'crit', title: 'Vulnerability SLAs breached', body: `${plural(vulnsBreached, 'vulnerability')} past their remediation SLA.` });
 
   return out;
 }

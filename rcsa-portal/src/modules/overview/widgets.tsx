@@ -24,6 +24,7 @@ const MODULE_ICON: Record<string, string> = {
   kpis: 'chart',
   awareness: 'grad',
   findings: 'edit',
+  vulns: 'alert',
 };
 
 const fmtDate = (iso: string): string => {

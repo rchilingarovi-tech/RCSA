@@ -18,6 +18,7 @@ import { SettingsPage } from './settings/SettingsPage';
 import { AuditPage } from './audit/AuditPage';
 import { DirectoryPage } from './directory/DirectoryPage';
 import { IncidentsPage } from './incidents/IncidentsPage';
+import { VulnsPage } from './vulns/VulnsPage';
 
 // Single source of truth for the left-hand menu. Each module is either `active`
 // (renders its own Component) or `planned` (renders the ComingSoon placeholder).
@@ -135,6 +136,15 @@ export const MODULES: ModuleDef[] = [
     status: 'active',
     description: 'Information-security / cyber incident tracking — dashboard and register.',
     Component: IncidentsPage,
+  },
+  {
+    id: 'vulns',
+    label: 'Vulnerabilities',
+    icon: 'alert',
+    group: 'Security Operations',
+    status: 'active',
+    description: 'Scan / pentest findings with severity-based remediation SLAs and breach flags.',
+    Component: VulnsPage,
   },
   {
     id: 'policies',

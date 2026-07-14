@@ -29,6 +29,8 @@ import type { ComplianceControl } from '../compliance/types';
 import { coverage } from '../compliance/types';
 import type { Finding } from '../findings/types';
 import { overdue as findingOverdue, overdueDays as findingOverdueDays, isOpenFinding } from '../findings/types';
+import type { Vuln } from '../vulns/types';
+import { isOpenVuln, slaBreached, slaDaysLeft, slaDeadline } from '../vulns/types';
 
 export type Level = 'Low' | 'Medium' | 'High' | 'Critical';
 
@@ -46,6 +48,7 @@ export interface OverviewData {
   courses: Course[];
   controls: ComplianceControl[];
   findings: Finding[];
+  vulns: Vuln[];
 }
 
 // ── Risk severity helpers ────────────────────────────────────────────────────
@@ -185,6 +188,21 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
         moduleId: 'risk-catalogue',
       }),
     );
+
+  // SLA-breached vulnerabilities — Critical when the vuln itself is
+  // Critical/High severity, otherwise High.
+  data.vulns.filter(slaBreached).forEach((v) =>
+    out.push({
+      id: `att-vul-${v.id}`,
+      priority: v.severity === 'Critical' || v.severity === 'High' ? 'Critical' : 'High',
+      label: `SLA breach: ${v.title}`,
+      source: v.id,
+      owner: v.owner || '—',
+      due: slaDeadline(v),
+      overdueDays: Math.abs(slaDaysLeft(v) ?? 0),
+      moduleId: 'vulns',
+    }),
+  );
 
   // Overdue audit/regulator findings — Critical when the finding itself is
   // Critical/High severity, otherwise High.
@@ -424,6 +442,12 @@ export function buildUpcoming(data: OverviewData, horizonDays: number): Upcoming
     .filter((f) => isOpenFinding(f) && f.dueDate)
     .forEach((f) =>
       push({ id: `up-fnd-${f.id}`, icon: 'edit', title: `Finding: ${f.title}`, subtext: `${f.source} · ${f.owner || 'Unassigned'}`, date: f.dueDate, moduleId: 'findings' }),
+    );
+
+  data.vulns
+    .filter((v) => isOpenVuln(v) && v.discovered)
+    .forEach((v) =>
+      push({ id: `up-vul-${v.id}`, icon: 'alert', title: `Vuln SLA: ${v.title}`, subtext: `${v.severity} · ${v.owner || 'Unassigned'}`, date: slaDeadline(v), moduleId: 'vulns' }),
     );
 
   return items.sort((a, b) => a.days - b.days);

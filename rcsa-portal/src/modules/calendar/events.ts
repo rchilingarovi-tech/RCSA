@@ -10,8 +10,10 @@ import type { AccessReview } from '../access/types';
 import type { PolicyDoc } from '../policies/types';
 import type { Course } from '../awareness/types';
 import type { Finding } from '../findings/types';
+import type { Vuln } from '../vulns/types';
+import { isOpenVuln, slaDeadline } from '../vulns/types';
 
-export type LayerKey = 'risk' | 'vendor' | 'compliance' | 'awareness';
+export type LayerKey = 'risk' | 'vendor' | 'compliance' | 'awareness' | 'vuln';
 export type EventStatus = 'Overdue' | 'Upcoming' | 'Done';
 
 export interface LayerDef {
@@ -26,6 +28,7 @@ export const LAYERS: LayerDef[] = [
   { key: 'vendor', label: 'Vendor Governance', sub: 'Contract Expirations & Reviews', tone: 'info' },
   { key: 'compliance', label: 'Compliance & Audits', sub: 'ISO 27001, PCI DSS, SWIFT CSP', tone: 'purple' },
   { key: 'awareness', label: 'Awareness Training', sub: 'Campaign Deadlines', tone: 'ok' },
+  { key: 'vuln', label: 'Vulnerability Management', sub: 'Scan & Pentest Remediation SLAs', tone: 'high' },
 ];
 
 export const layerTone = (k: LayerKey): string => LAYERS.find((l) => l.key === k)?.tone ?? 'mut';
@@ -54,6 +57,7 @@ export interface CalData {
   policies: PolicyDoc[];
   courses: Course[];
   findings: Finding[];
+  vulns: Vuln[];
 }
 
 const daysBetween = (fromIso: string, toIso: string): number =>
@@ -179,6 +183,22 @@ export function buildCalendarEvents(d: CalData): CalEvent[] {
       type: 'Audit Finding',
       description: `${f.source}${f.ref ? ` · ${f.ref}` : ''} · ${f.status}`,
       done: f.status === 'Closed',
+    }),
+  );
+
+  d.vulns.forEach((v) =>
+    add({
+      id: v.id,
+      title: v.title,
+      date: slaDeadline(v),
+      layer: 'vuln',
+      source: 'Vulnerability / Pentest Tracker',
+      moduleId: 'vulns',
+      owner: v.owner || '—',
+      criticality: v.severity,
+      type: 'Remediation SLA',
+      description: `${v.source}${v.ref ? ` · ${v.ref}` : ''} · ${v.asset || 'No asset'} · ${v.status}`,
+      done: !isOpenVuln(v),
     }),
   );
 

@@ -13,6 +13,7 @@ import { committeeRepo } from '../committee/repo';
 import { awarenessRepo } from '../awareness/repo';
 import { complianceRepo } from '../compliance/repo';
 import { findingsRepo } from '../findings/repo';
+import { vulnRepo } from '../vulns/repo';
 import {
   buildAttentionItems,
   buildUpcoming,
@@ -122,6 +123,7 @@ export function OverviewPage() {
       courses: awarenessRepo.list(),
       controls: complianceRepo.list(),
       findings: findingsRepo.list(),
+      vulns: vulnRepo.list(),
     }),
     [],
   );
