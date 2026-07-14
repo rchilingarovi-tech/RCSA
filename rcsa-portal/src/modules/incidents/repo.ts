@@ -9,4 +9,7 @@ export const incidentRepo = createLocalRepo<Incident>({
   pad: 3,
   entity: 'Incident',
   describe: (i) => `${i.id} — ${i.shortDesc}`,
+  // Confidential breach narratives must not be duplicated into the audit trail
+  // (which is readable by anyone with audit-log view).
+  auditRedact: ['description', 'rootCause', 'correctiveAction'],
 });

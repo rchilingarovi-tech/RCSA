@@ -26,9 +26,16 @@ export function createLocalRepo<T extends { id: string }>(opts: {
   entity?: string;
   /** Human description of a record for audit summaries. Defaults to "<entity> <id>". */
   describe?: (item: T) => string;
+  /** Field names whose VALUES must not be copied into the audit trail (sensitive
+   *  free text, e.g. incident descriptions). The audit still records THAT the
+   *  field changed — just not its content. */
+  auditRedact?: (keyof T & string)[];
 }): LocalRepo<T> {
-  const { key, seed, idPrefix, pad = 3, entity = idPrefix, describe } = opts;
+  const { key, seed, idPrefix, pad = 3, entity = idPrefix, describe, auditRedact = [] } = opts;
   const label = (item: T) => (describe ? describe(item) : `${entity} ${item.id}`);
+  const redactSet = new Set<string>(auditRedact);
+  const redact = (changes: ReturnType<typeof diffFields>) =>
+    changes.map((c) => (redactSet.has(c.field) ? { ...c, from: '[redacted]', to: '[updated]' } : c));
 
   function write(v: T[]): void {
     try {
@@ -62,9 +69,11 @@ export function createLocalRepo<T extends { id: string }>(opts: {
       if (isNew) all.push(item);
       else all[idx] = item;
       write(all);
-      const changes = isNew
-        ? diffFields({}, item as Record<string, unknown>)
-        : diffFields(before as Record<string, unknown>, item as Record<string, unknown>);
+      const changes = redact(
+        isNew
+          ? diffFields({}, item as Record<string, unknown>)
+          : diffFields(before as Record<string, unknown>, item as Record<string, unknown>),
+      );
       auditLog.record({
         action: isNew ? 'create' : 'update',
         entity,
@@ -84,7 +93,7 @@ export function createLocalRepo<T extends { id: string }>(opts: {
         entity,
         entityId: id,
         summary: `Deleted ${item ? label(item) : `${entity} ${id}`}`,
-        changes: item ? diffFields(item as Record<string, unknown>, {}) : undefined,
+        changes: item ? redact(diffFields(item as Record<string, unknown>, {})) : undefined,
       });
       return all;
     },
