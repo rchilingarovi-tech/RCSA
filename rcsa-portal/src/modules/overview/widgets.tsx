@@ -38,6 +38,7 @@ export function Panel({
   children,
   className,
   center,
+  span: _span,
 }: {
   title: string;
   meta?: ReactNode;
@@ -47,7 +48,10 @@ export function Panel({
   className?: string;
   /** Vertically center content (for charts) so it fills a stretched card; tables keep top-align. */
   center?: boolean;
+  /** Column span consumed by the surrounding sortable ChartGrid (not used here). */
+  span?: 4 | 6 | 8 | 12;
 }) {
+  void _span;
   return (
     <div className={`section-card flex flex-col overflow-hidden h-full ${className ?? ''}`}>
       <div className="px-5 py-3 border-b flex items-center justify-between gap-2" style={{ borderColor: 'var(--border)' }}>

@@ -126,7 +126,7 @@ export function PlanPage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="plan-charts">
         <ChartPanel title="Priority mix" span={4} filterLabel={chipFor('pri:')} onClearFilter={filter.clear}>
           <DonutChart segments={prioritySeg} center={String(items.length)} sub="initiatives" activeKey={filter.activeKey} onSelect={selectPriority} />
         </ChartPanel>

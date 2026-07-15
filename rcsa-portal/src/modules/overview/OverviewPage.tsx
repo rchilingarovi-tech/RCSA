@@ -25,6 +25,7 @@ import {
 } from './aggregate';
 import { previousSnapshot, recordSnapshot } from './snapshots';
 import { setIntent } from '../../lib/intent';
+import { ChartGrid } from '../../components/charts/primitives';
 import {
   AttentionTable,
   FooterStatus,
@@ -274,27 +275,23 @@ export function OverviewPage() {
           <KpiCard icon="check" tone="low" title="Compliance score" value={`${full.complianceScore}%`} sub="Across all frameworks" delta={delta('complianceScore')} higherIsBetter={true} periodLabel={periodLabel} linkLabel="View compliance" onClick={() => navigate('compliance')} />
         </div>
 
-        {/* Middle row — cross-service worklist + per-service posture */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <Panel title="Top CISO attention items" meta={attention.length > 6 ? `6 of ` : attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} className="lg:col-span-6">
+        {/* Panels — drag the ⠿ handle to reorder; the layout persists per user */}
+        <ChartGrid sortKey="overview">
+          <Panel title="Top CISO attention items" meta={attention.length > 6 ? `6 of ` : attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} span={6}>
             <AttentionTable items={attention.slice(0, 6)} onOpen={navigate} />
           </Panel>
           {show('health') && (
-            <Panel title="Service health" meta={`${tiles.length} services`} className="lg:col-span-6">
+            <Panel title="Service health" meta={`${tiles.length} services`} span={6}>
               <ServiceHealthGrid tiles={tiles} onOpen={navigate} />
             </Panel>
           )}
-        </div>
-
-        {/* Bottom row — ops watch + cross-service activity + what's next */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
           {show('incidents') && (
-            <Panel title="Open incident watch" footer="View all incidents" onFooter={() => navigate('incidents')}>
+            <Panel span={4} title="Open incident watch" footer="View all incidents" onFooter={() => navigate('incidents')}>
               <WatchList rows={incidentWatch} empty="No open incidents. 🎉" onOpen={() => navigate('incidents')} />
             </Panel>
           )}
           {show('activity') && auditPerms.view && (
-            <Panel title="Recent activity" meta="All services" footer="View audit log" onFooter={() => navigate('audit-log')}>
+            <Panel span={4} title="Recent activity" meta="All services" footer="View audit log" onFooter={() => navigate('audit-log')}>
               {events.length === 0 ? (
                 <div className="px-5 py-8 text-center text-sm" style={{ color: 'var(--text3)' }}>No recent activity yet.</div>
               ) : (
@@ -313,11 +310,11 @@ export function OverviewPage() {
             </Panel>
           )}
           {show('upcoming') && (
-            <Panel title="Upcoming reviews & deadlines" meta="Next 90 days" footer="Open master calendar" onFooter={() => navigate('master-calendar')}>
+            <Panel span={4} title="Upcoming reviews & deadlines" meta="Next 90 days" footer="Open master calendar" onFooter={() => navigate('master-calendar')}>
               <UpcomingList items={upcoming} onOpen={navigate} />
             </Panel>
           )}
-        </div>
+        </ChartGrid>
 
         <FooterStatus updated={fmtNow()} />
       </div>

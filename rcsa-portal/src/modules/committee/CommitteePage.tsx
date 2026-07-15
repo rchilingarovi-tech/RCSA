@@ -122,7 +122,7 @@ export function CommitteePage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="committee-charts">
         <ChartPanel title="Meeting status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={statusSeg} center={String(totalOpen)} sub="open actions" activeKey={filter.activeKey} onSelect={selectStatus} />
         </ChartPanel>

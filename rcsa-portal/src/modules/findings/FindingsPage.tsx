@@ -164,7 +164,7 @@ export function FindingsPage() {
       </div>
 
       {/* Interactive charts */}
-      <ChartGrid>
+      <ChartGrid sortKey="findings-charts">
         <ChartPanel title="Open by severity" span={4} filterLabel={chipFor('sev:')} onClearFilter={filter.clear}>
           <DonutChart segments={sevSeg} center={String(open.length)} sub="open" activeKey={filter.activeKey} onSelect={selectSev} />
         </ChartPanel>

@@ -123,7 +123,7 @@ export function AccessPage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="access-charts">
         <ChartPanel title="Campaign state" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={stateSeg} center={String(reviews.length)} sub="campaigns" activeKey={filter.activeKey} onSelect={selectState} />
         </ChartPanel>

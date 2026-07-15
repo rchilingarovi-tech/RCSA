@@ -134,7 +134,7 @@ export function PoliciesPage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="policies-charts">
         <ChartPanel title="Document status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={statusSeg} center={String(docs.length)} sub="documents" activeKey={filter.activeKey} onSelect={selectStatus} />
         </ChartPanel>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, isValidElement, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 
 // 12-column responsive grid. Panels span 4/6/8/12 on lg+, and collapse to full
 // width below lg. Literal class strings so Tailwind keeps them.
@@ -9,8 +9,100 @@ const SPAN: Record<number, string> = {
   12: 'lg:col-span-12',
 };
 
-export function ChartGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">{children}</div>;
+const slugOf = (v: unknown, i: number): string =>
+  typeof v === 'string' ? v.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `item-${i}`;
+
+/**
+ * 12-col chart grid. Pass `sortKey` to enable drag-to-reorder: each child gets a
+ * grab handle (visible on hover); the order persists per page in localStorage,
+ * keyed by the child's `title` prop so hidden/shown panels keep their place.
+ */
+export function ChartGrid({ children, sortKey }: { children: ReactNode; sortKey?: string }) {
+  if (!sortKey) return <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">{children}</div>;
+  return <SortableGrid sortKey={sortKey}>{children}</SortableGrid>;
+}
+
+function SortableGrid({ sortKey, children }: { sortKey: string; children: ReactNode }) {
+  const storeKey = `infosec.order.${sortKey}`;
+  const els = Children.toArray(children).filter(isValidElement) as ReactElement[];
+  const ids = els.map((el, i) => slugOf((el.props as { title?: unknown }).title, i));
+
+  const [saved, setSaved] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(storeKey);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? (arr as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [armedId, setArmedId] = useState<string | null>(null);
+
+  // Saved order ∩ current panels, then any new panels appended in natural order.
+  const ordered = useMemo(() => {
+    const present = new Set(ids);
+    const kept = saved.filter((id) => present.has(id));
+    const missing = ids.filter((id) => !kept.includes(id));
+    return [...kept, ...missing];
+  }, [ids.join('|'), saved]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const byId = new Map(ids.map((id, i) => [id, els[i]]));
+
+  const applyOrder = (next: string[]) => {
+    setSaved(next);
+    try { localStorage.setItem(storeKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const moveTo = (targetId: string) => {
+    if (!dragId || dragId === targetId) return;
+    const from = ordered.indexOf(dragId);
+    const next = ordered.filter((x) => x !== dragId);
+    const ti = next.indexOf(targetId);
+    if (ti === -1) return;
+    // Dragging forward drops after the target; backward drops before it — the
+    // classic live-swap feel.
+    next.splice(from < ordered.indexOf(targetId) ? ti + 1 : ti, 0, dragId);
+    applyOrder(next);
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      {ordered.map((id) => {
+        const el = byId.get(id);
+        if (!el) return null;
+        const span = SPAN[(el.props as { span?: number }).span ?? 4] ?? SPAN[4];
+        return (
+          <div
+            key={id}
+            className={`relative group/drag min-w-0 ${span} ${dragId === id ? 'opacity-60' : ''}`}
+            draggable={armedId === id}
+            onDragStart={(e) => {
+              if (armedId !== id) { e.preventDefault(); return; }
+              setDragId(id);
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragEnter={() => moveTo(id)}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnd={() => { setDragId(null); setArmedId(null); }}
+          >
+            <button
+              type="button"
+              title="Drag to reorder"
+              aria-label="Drag to reorder"
+              onMouseDown={() => setArmedId(id)}
+              onMouseUp={() => setArmedId(null)}
+              className="no-print absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-md border hidden lg:group-hover/drag:flex items-center justify-center cursor-grab active:cursor-grabbing text-[13px] leading-none"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text3)' }}
+            >
+              ⠿
+            </button>
+            {el}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 interface PanelProps {

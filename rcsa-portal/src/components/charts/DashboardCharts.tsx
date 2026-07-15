@@ -266,7 +266,7 @@ export function DashboardCharts() {
         )}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="rcsa-charts">
         {show('criticality') && (
           <ChartPanel title="Asset criticality" span={4}>
             <MeterRows rows={(['Low', 'Medium', 'High'] as const).map((k) => ({

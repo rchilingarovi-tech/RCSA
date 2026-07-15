@@ -176,7 +176,7 @@ export function KpisPage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="kpis-charts">
         <ChartPanel title="RAG overview" span={4} filterLabel={chipFor('rag:')} onClearFilter={filter.clear}>
           <RagOverview segments={ragSeg} total={kpis.length} activeKey={filter.activeKey} onSelect={selectRag} />
         </ChartPanel>

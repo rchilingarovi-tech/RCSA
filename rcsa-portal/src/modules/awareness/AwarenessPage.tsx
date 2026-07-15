@@ -122,7 +122,7 @@ export function AwarenessPage() {
         ))}
       </div>
 
-      <ChartGrid>
+      <ChartGrid sortKey="awareness-charts">
         <ChartPanel title="Programme mix" span={4} filterLabel={chipFor('ty:')} onClearFilter={filter.clear}>
           <DonutChart segments={typeSeg} center={`${avg}%`} sub="avg completion" activeKey={filter.activeKey} onSelect={selectType} />
         </ChartPanel>

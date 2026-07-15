@@ -162,7 +162,7 @@ export function VendorsPage() {
       </div>
 
       {/* Charts */}
-      <ChartGrid>
+      <ChartGrid sortKey="vendors-charts">
         <ChartPanel title="Vendor criticality" span={4} filterLabel={chipFor('crit:')} onClearFilter={filter.clear}>
           <DonutChart segments={critSeg} center={String(vendors.length)} sub="vendors" activeKey={filter.activeKey} onSelect={selectCrit} />
         </ChartPanel>

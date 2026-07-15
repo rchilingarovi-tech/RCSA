@@ -3,6 +3,7 @@ import { useStore } from '../../state/AppStore';
 import { useNav } from '../../state/NavContext';
 import { PageHeader } from '../rcsa/PageHeader';
 import { Modal } from '../../components/common/Modal';
+import { ChartGrid } from '../../components/charts/primitives';
 import { vendorRepo } from '../vendors/repo';
 import { accessRepo } from '../access/repo';
 import { policyRepo } from '../policies/repo';
@@ -476,7 +477,7 @@ function CalendarDashboard({
         <StatTile label="Upcoming · next 90 days" value={up90.length} tone="ok" onClick={onAgenda} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <ChartGrid sortKey="calendar-band">
         <DashCard title="Overdue by category" hint="Click to filter">
           {overdue.length === 0 ? <NoneRow label="Nothing overdue. 🎉" /> : catOverdue.map((c) => (
             <CatBar key={c.l.key} label={c.l.label} tone={c.l.tone} value={c.n} max={maxOverdue} active={isFocused(c.l.key)} onClick={() => onFocusLayer(c.l.key)} />
@@ -494,7 +495,7 @@ function CalendarDashboard({
             <CatBar key={c.l.key} label={c.l.label} tone={c.l.tone} value={c.n} max={maxUpcoming} active={isFocused(c.l.key)} onClick={() => onFocusLayer(c.l.key)} />
           ))}
         </DashCard>
-      </div>
+      </ChartGrid>
     </div>
   );
 }

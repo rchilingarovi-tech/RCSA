@@ -112,7 +112,7 @@ export function AssetCataloguePage() {
       </div>
 
       {/* Interactive charts */}
-      <ChartGrid>
+      <ChartGrid sortKey="assets-charts">
         <ChartPanel title="Criticality distribution" span={4} filterLabel={chipFor('crit:')} onClearFilter={filter.clear}>
           <DonutChart segments={critSeg} center={String(assets.length)} sub="assets" activeKey={filter.activeKey} onSelect={selectCrit} />
         </ChartPanel>
