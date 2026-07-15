@@ -7,7 +7,6 @@ import type { Asset, Risk, Treatment } from '../../data/models';
 import {
   assetValue,
   criticality,
-  inherentScore,
   residualScore,
   riskLevel,
   isOverdue,
@@ -52,9 +51,7 @@ export interface OverviewData {
 }
 
 // ── Risk severity helpers ────────────────────────────────────────────────────
-/** Effective score = residual when assessed, otherwise inherent. */
-export const effectiveScore = (r: Risk): number => residualScore(r) ?? inherentScore(r);
-export const effectiveLevel = (r: Risk): Level => riskLevel(effectiveScore(r))[0] as Level;
+
 /** Residual level, or null when residual risk has not been assessed. */
 export function residualLevel(r: Risk): Level | null {
   const s = residualScore(r);
@@ -72,18 +69,7 @@ export function daysUntil(dateIso: string): number | null {
   return Math.round((new Date(dateIso).getTime() - new Date(today()).getTime()) / 86400000);
 }
 
-/** Departments a risk touches, via its assets. */
-export function riskDepartments(r: Risk, assetById: Map<string, Asset>): string[] {
-  const set = new Set<string>();
-  r.assetIds.forEach((id) => {
-    const a = assetById.get(id);
-    if (a?.department) set.add(a.department);
-  });
-  return [...set];
-}
 
-export const indexAssets = (assets: Asset[]): Map<string, Asset> =>
-  new Map(assets.map((a) => [a.id, a]));
 
 // ── Headline KPIs ─────────────────────────────────────────────────────────────
 export interface Headline {
@@ -344,96 +330,6 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     if (p !== 0) return p;
     return (b.overdueDays ?? -1) - (a.overdueDays ?? -1);
   });
-}
-
-// ── Residual heat map (impact × likelihood counts) ───────────────────────────
-/** matrix[impact-1][likelihood-1] = count of ASSESSED residual risks in that cell. */
-export function residualHeatmap(risks: Risk[]): number[][] {
-  const m: number[][] = Array.from({ length: 5 }, () => Array(5).fill(0));
-  risks.forEach((r) => {
-    if (r.resImpact != null && r.resLikelihood != null) {
-      m[r.resImpact - 1][r.resLikelihood - 1] += 1;
-    }
-  });
-  return m;
-}
-
-// ── Risks by department (stacked) ────────────────────────────────────────────
-export interface DeptDist {
-  dept: string;
-  critical: number;
-  high: number;
-  medlow: number;
-  total: number;
-}
-
-export function risksByDepartment(
-  risks: Risk[],
-  assetById: Map<string, Asset>,
-  topN = 7,
-): DeptDist[] {
-  const map = new Map<string, DeptDist>();
-  risks.forEach((r) => {
-    const level = effectiveLevel(r);
-    riskDepartments(r, assetById).forEach((dept) => {
-      const d = map.get(dept) ?? { dept, critical: 0, high: 0, medlow: 0, total: 0 };
-      if (level === 'Critical') d.critical += 1;
-      else if (level === 'High') d.high += 1;
-      else d.medlow += 1;
-      d.total += 1;
-      map.set(dept, d);
-    });
-  });
-  return [...map.values()].sort((a, b) => b.total - a.total).slice(0, topN);
-}
-
-// ── Top residual risks ───────────────────────────────────────────────────────
-export type Trend = 'up' | 'down' | 'flat';
-export interface TopResidual {
-  id: string;
-  assetId: string;
-  score: number;
-  level: Level;
-  trend: Trend; // residual vs inherent: down = improved, up = worsened
-}
-
-export function topResidualRisks(risks: Risk[], n = 5): TopResidual[] {
-  return risks
-    .filter((r) => residualScore(r) != null)
-    .map((r) => {
-      const res = residualScore(r) as number;
-      const inh = inherentScore(r);
-      return {
-        id: r.id,
-        assetId: r.assetIds[0] ?? '—',
-        score: res,
-        level: riskLevel(res)[0] as Level,
-        trend: (res < inh ? 'down' : res > inh ? 'up' : 'flat') as Trend,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, n);
-}
-
-// ── Overdue treatments ───────────────────────────────────────────────────────
-export interface OverdueTreatmentRow {
-  id: string;
-  riskId: string;
-  due: string;
-  overdueDays: number;
-}
-
-export function overdueTreatmentRows(treatments: Treatment[], n = 6): OverdueTreatmentRow[] {
-  return treatments
-    .filter(isOverdue)
-    .map((t) => ({
-      id: t.id,
-      riskId: t.riskIds[0] ?? '—',
-      due: t.dueDate,
-      overdueDays: daysOverdue(t.dueDate),
-    }))
-    .sort((a, b) => b.overdueDays - a.overdueDays)
-    .slice(0, n);
 }
 
 // ── Upcoming reviews & deadlines (forward-looking) ───────────────────────────
