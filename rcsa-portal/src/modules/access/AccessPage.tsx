@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -42,11 +42,11 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
   return (
     <Modal open onClose={onClose} title={e ? `Edit Campaign — ${e.id}` : 'New Access Review'} subtitle="Entitlement review campaign" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Campaign *</label><input value={campaign} onChange={(ev) => setCampaign(ev.target.value)} className={field} placeholder="e.g. Q2 privileged access review" /></div>
-        <div><label className={lbl}>Scope</label><input value={scope} onChange={(ev) => setScope(ev.target.value)} className={field} placeholder="What is being reviewed" /></div>
+        <div><label className={lbl}>Campaign *</label><input value={campaign} maxLength={200} onChange={(ev) => setCampaign(ev.target.value)} className={field} placeholder="e.g. Q2 privileged access review" /></div>
+        <div><label className={lbl}>Scope</label><input value={scope} maxLength={200} onChange={(ev) => setScope(ev.target.value)} className={field} placeholder="What is being reviewed" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className={lbl}>Period</label><input value={period} onChange={(ev) => setPeriod(ev.target.value)} className={field} placeholder="2026-Q2" /></div>
-          <div><label className={lbl}>Reviewer</label><input value={reviewer} onChange={(ev) => setReviewer(ev.target.value)} className={field} placeholder="Reviewer / team" /></div>
+          <div><label className={lbl}>Period</label><input value={period} maxLength={40} onChange={(ev) => setPeriod(ev.target.value)} className={field} placeholder="2026-Q2" /></div>
+          <div><label className={lbl}>Reviewer</label><input value={reviewer} maxLength={120} onChange={(ev) => setReviewer(ev.target.value)} className={field} placeholder="Reviewer / team" /></div>
           <div><label className={lbl}>Due date</label><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></div>
         </div>
         <div><label className={lbl}>Progress %</label><input value={progress} onChange={(ev) => setProgress(ev.target.value)} className={field} inputMode="numeric" placeholder="0–100" /></div>
@@ -66,6 +66,15 @@ export function AccessPage() {
   const [editing, setEditing] = useState<AccessReview | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<AccessReview>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.access.v2') setReviews(accessRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const STATES = [
     { key: 'st:Completed', label: 'Completed', tone: 'low' as Tone, pred: (r: AccessReview) => r.progress >= 100 },

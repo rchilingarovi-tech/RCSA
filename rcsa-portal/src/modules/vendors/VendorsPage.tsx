@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -60,7 +60,7 @@ function VendorModal({ vendor, onClose, onSave }: { vendor: Vendor | 'new'; onCl
   return (
     <Modal open onClose={onClose} title={e ? `Edit Vendor — ${e.id}` : 'New Vendor'} subtitle="Third-party vendor" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Vendor name *</label><input value={name} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. CardFlow Processing" /></div>
+        <div><label className={lbl}>Vendor name *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. CardFlow Processing" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={lbl}>Criticality</label><select value={criticality} onChange={(ev) => setCriticality(ev.target.value as Criticality)} className={field}>{CRITICALITIES.map((c) => <option key={c}>{c}</option>)}</select></div>
           <div><label className={lbl}>Data access</label><select value={dataAccess} onChange={(ev) => setDataAccess(ev.target.value as DataAccess)} className={field}>{DATA_ACCESS.map((d) => <option key={d}>{d}</option>)}</select></div>
@@ -98,6 +98,15 @@ export function VendorsPage() {
   const [editing, setEditing] = useState<Vendor | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<Vendor>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.vendors.v2') setVendors(vendorRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const in60 = iso(60), in180 = iso(180);
 

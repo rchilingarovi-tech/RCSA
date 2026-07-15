@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -50,14 +50,14 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
   return (
     <Modal open onClose={onClose} title={e ? `Edit KPI — ${e.id}` : 'New KPI'} subtitle="Performance metric" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Name *</label><input value={name} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Mean time to contain" /></div>
+        <div><label className={lbl}>Name *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Mean time to contain" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><label className={lbl}>Current *</label><input value={current} onChange={(ev) => setCurrent(ev.target.value)} className={field} inputMode="decimal" /></div>
           <div><label className={lbl}>Target *</label><input value={target} onChange={(ev) => setTarget(ev.target.value)} className={field} inputMode="decimal" /></div>
-          <div><label className={lbl}>Unit</label><input value={unit} onChange={(ev) => setUnit(ev.target.value)} className={field} placeholder="% / h / count" /></div>
+          <div><label className={lbl}>Unit</label><input value={unit} maxLength={12} onChange={(ev) => setUnit(ev.target.value)} className={field} placeholder="% / h / count" /></div>
           <div><label className={lbl}>Direction</label><select value={direction} onChange={(ev) => setDirection(ev.target.value as Direction)} className={field}>{DIRECTIONS.map((d) => <option key={d}>{d}</option>)}</select></div>
         </div>
-        <div><label className={lbl}>Trend history (comma-separated, oldest → newest)</label><input value={history} onChange={(ev) => setHistory(ev.target.value)} className={field} placeholder="40, 35, 30, 26, 22, 19" /></div>
+        <div><label className={lbl}>Trend history (comma-separated, oldest → newest)</label><input value={history} maxLength={400} onChange={(ev) => setHistory(ev.target.value)} className={field} placeholder="40, 35, 30, 26, 22, 19" /></div>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save KPI' : 'Create KPI'}</button>
@@ -127,6 +127,15 @@ export function KpisPage() {
   const [editing, setEditing] = useState<Kpi | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<Kpi>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.kpis.v2') setKpis(kpiRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const RAGS: { key: string; label: string; tone: Tone }[] = [
     { key: 'rag:low', label: 'On Track', tone: 'low' },

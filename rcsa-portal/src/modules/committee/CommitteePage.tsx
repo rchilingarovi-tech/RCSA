@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -45,14 +45,14 @@ function MeetingModal({ meeting, onClose, onSave }: { meeting: Meeting | 'new'; 
   return (
     <Modal open onClose={onClose} title={e ? `Edit Meeting — ${e.id}` : 'New Meeting'} subtitle="Committee meeting record" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Title *</label><input value={title} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. InfoSec Steering Committee — Q3" /></div>
+        <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. InfoSec Steering Committee — Q3" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} className={field} /></div>
           <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as MeetingStatus)} className={field}>{MEETING_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
           <div><label className={lbl}>Open actions</label><input value={openActions} onChange={(ev) => setOpenActions(ev.target.value)} className={field} inputMode="numeric" /></div>
         </div>
-        <div><label className={lbl}>Attendance</label><input value={attendance} onChange={(ev) => setAttendance(ev.target.value)} className={field} placeholder="e.g. CISO, CIO, CRO" /></div>
-        <div><label className={lbl}>Decisions / minutes</label><textarea value={decisions} onChange={(ev) => setDecisions(ev.target.value)} className={field} rows={3} placeholder="Key decisions and outcomes" /></div>
+        <div><label className={lbl}>Attendance</label><input value={attendance} maxLength={1000} onChange={(ev) => setAttendance(ev.target.value)} className={field} placeholder="e.g. CISO, CIO, CRO" /></div>
+        <div><label className={lbl}>Decisions / minutes</label><textarea value={decisions} maxLength={2000} onChange={(ev) => setDecisions(ev.target.value)} className={field} rows={3} placeholder="Key decisions and outcomes" /></div>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save Meeting' : 'Create Meeting'}</button>
@@ -69,6 +69,15 @@ export function CommitteePage() {
   const [editing, setEditing] = useState<Meeting | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<Meeting>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.committee.v2') setMeetings(committeeRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const totalOpen = meetings.reduce((s, m) => s + (Number(m.openActions) || 0), 0);
 

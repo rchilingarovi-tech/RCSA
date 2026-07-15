@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -47,14 +47,14 @@ function PolicyModal({ doc, onClose, onSave }: { doc: PolicyDoc | 'new'; onClose
   return (
     <Modal open onClose={onClose} title={e ? `Edit Document — ${e.id}` : 'New Document'} subtitle="Policy / document record" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Title *</label><input value={title} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Access Control Standard" /></div>
+        <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Access Control Standard" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><label className={lbl}>Type</label><select value={type} onChange={(ev) => setType(ev.target.value as DocType)} className={field}>{DOC_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
-          <div><label className={lbl}>Version</label><input value={version} onChange={(ev) => setVersion(ev.target.value)} className={field} placeholder="1.0" /></div>
+          <div><label className={lbl}>Version</label><input value={version} maxLength={20} onChange={(ev) => setVersion(ev.target.value)} className={field} placeholder="1.0" /></div>
           <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as DocStatus)} className={field}>{DOC_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
           <div><label className={lbl}>Next review</label><input type="date" value={nextReview} onChange={(ev) => setNextReview(ev.target.value)} className={field} /></div>
         </div>
-        <div><label className={lbl}>Owner</label><input value={owner} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Owner / team" /></div>
+        <div><label className={lbl}>Owner</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Owner / team" /></div>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save Document' : 'Create Document'}</button>
@@ -71,6 +71,15 @@ export function PoliciesPage() {
   const [editing, setEditing] = useState<PolicyDoc | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<PolicyDoc>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.policies.v2') setDocs(policyRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const in30 = iso(30);
   const CADENCE = [

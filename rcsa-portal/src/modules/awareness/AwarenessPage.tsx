@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
@@ -44,14 +44,14 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
   return (
     <Modal open onClose={onClose} title={e ? `Edit Course — ${e.id}` : 'New Course / Campaign'} subtitle="Awareness training item" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
-        <div><label className={lbl}>Course / campaign *</label><input value={name} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Annual security awareness 2026" /></div>
+        <div><label className={lbl}>Course / campaign *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Annual security awareness 2026" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label className={lbl}>Type</label><select value={type} onChange={(ev) => setType(ev.target.value as CourseType)} className={field}>{COURSE_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
           <div><label className={lbl}>Method</label><select value={method} onChange={(ev) => setMethod(ev.target.value as Method)} className={field}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select></div>
           <div><label className={lbl}>Due date</label><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Audience</label><input value={audience} onChange={(ev) => setAudience(ev.target.value)} className={field} placeholder="e.g. All staff (5,500)" /></div>
+          <div><label className={lbl}>Audience</label><input value={audience} maxLength={120} onChange={(ev) => setAudience(ev.target.value)} className={field} placeholder="e.g. All staff (5,500)" /></div>
           <div><label className={lbl}>Completion %</label><input value={completion} onChange={(ev) => setCompletion(ev.target.value)} className={field} inputMode="numeric" /></div>
         </div>
         <div className="flex justify-end gap-3 pt-4 border-t">
@@ -70,6 +70,15 @@ export function AwarenessPage() {
   const [editing, setEditing] = useState<Course | 'new' | null>(null);
   const [q, setQ] = useState('');
   const filter = useChartFilter<Course>();
+
+  // Multi-tab safety: re-read when another tab writes the store.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'infosec.awareness.v2') setCourses(awarenessRepo.list());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const avg = courses.length ? Math.round(courses.reduce((s, c) => s + (Number(c.completion) || 0), 0) / courses.length) : 0;
 
