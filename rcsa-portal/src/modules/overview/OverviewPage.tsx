@@ -24,6 +24,7 @@ import {
   type OverviewData,
 } from './aggregate';
 import { previousSnapshot, recordSnapshot } from './snapshots';
+import { setIntent } from '../../lib/intent';
 import {
   AttentionTable,
   FooterStatus,
@@ -254,7 +255,7 @@ export function OverviewPage() {
           {menu === 'quick' && (
             <div className="absolute right-0 mt-2 w-56 section-card p-2 z-50">
               {QUICK_ACTIONS.map((a) => (
-                <button key={a.module} onClick={() => { setMenu(null); navigate(a.module); }} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left text-[13px] risk-row" style={{ color: 'var(--text2)' }}>
+                <button key={a.module} onClick={() => { setMenu(null); setIntent(`new:${a.module}`); navigate(a.module); }} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left text-[13px] risk-row" style={{ color: 'var(--text2)' }}>
                   <span style={{ color: 'var(--accent)' }}><Icon name={a.icon} size={15} /></span>{a.label}
                 </button>
               ))}
@@ -275,7 +276,7 @@ export function OverviewPage() {
 
         {/* Middle row — cross-service worklist + per-service posture */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <Panel title="Top CISO attention items" meta={attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} className="lg:col-span-6">
+          <Panel title="Top CISO attention items" meta={attention.length > 6 ? `6 of ` : attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} className="lg:col-span-6">
             <AttentionTable items={attention.slice(0, 6)} onOpen={navigate} />
           </Panel>
           {show('health') && (

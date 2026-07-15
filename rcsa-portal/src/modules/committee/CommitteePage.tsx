@@ -18,6 +18,7 @@ import {
   type Tone,
 } from '../../components/charts/primitives';
 import { today } from '../../domain/scoring';
+import { takeIntent } from '../../lib/intent';
 import { committeeRepo } from './repo';
 import { MEETING_STATUSES, statusToken, type Meeting, type MeetingStatus } from './types';
 
@@ -66,7 +67,7 @@ export function CommitteePage() {
   const ui = useUi();
   const perms = usePermissions('committee');
   const [meetings, setMeetings] = useState<Meeting[]>(() => committeeRepo.list());
-  const [editing, setEditing] = useState<Meeting | 'new' | null>(null);
+  const [editing, setEditing] = useState<Meeting | 'new' | null>(() => (takeIntent('new:committee') ? 'new' : null));
   const [q, setQ] = useState('');
   const filter = useChartFilter<Meeting>();
 

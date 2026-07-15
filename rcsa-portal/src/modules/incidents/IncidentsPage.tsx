@@ -7,6 +7,7 @@ import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { incidentIo } from './io';
+import { takeIntent } from '../../lib/intent';
 import { incidentRepo } from './repo';
 import { IncidentsDashboard } from './IncidentsDashboard';
 import { IncidentList } from './IncidentList';
@@ -31,7 +32,7 @@ export function IncidentsPage() {
   const perms = usePermissions('incidents');
   const [incidents, setIncidents] = useState<Incident[]>(() => incidentRepo.list());
   const [filter, setFilter] = useState<IncidentFilter>(EMPTY_INCIDENT_FILTER);
-  const [editing, setEditing] = useState<Incident | 'new' | null>(null);
+  const [editing, setEditing] = useState<Incident | 'new' | null>(() => (takeIntent('new:incidents') ? 'new' : null));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Multi-tab safety: when another tab writes the incidents store, re-read it so

@@ -18,6 +18,7 @@ import {
   type Tone,
 } from '../../components/charts/primitives';
 import { today } from '../../domain/scoring';
+import { takeIntent } from '../../lib/intent';
 import { findingsRepo } from './repo';
 import {
   FINDING_SEVERITIES,
@@ -99,7 +100,7 @@ export function FindingsPage() {
   const ui = useUi();
   const perms = usePermissions('findings');
   const [findings, setFindings] = useState<Finding[]>(() => findingsRepo.list());
-  const [editing, setEditing] = useState<Finding | 'new' | null>(null);
+  const [editing, setEditing] = useState<Finding | 'new' | null>(() => (takeIntent('new:findings') ? 'new' : null));
   const [q, setQ] = useState('');
   const filter = useChartFilter<Finding>();
 

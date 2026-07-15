@@ -16,6 +16,7 @@ import {
   type Tone,
 } from '../../components/charts/primitives';
 import { today } from '../../domain/scoring';
+import { takeIntent } from '../../lib/intent';
 import { vulnRepo } from './repo';
 import {
   SLA_DAYS,
@@ -116,7 +117,7 @@ export function VulnsPage() {
   const ui = useUi();
   const perms = usePermissions('vulns');
   const [vulns, setVulns] = useState<Vuln[]>(() => vulnRepo.list());
-  const [editing, setEditing] = useState<Vuln | 'new' | null>(null);
+  const [editing, setEditing] = useState<Vuln | 'new' | null>(() => (takeIntent('new:vulns') ? 'new' : null));
   const [q, setQ] = useState('');
   const filter = useChartFilter<Vuln>();
 
