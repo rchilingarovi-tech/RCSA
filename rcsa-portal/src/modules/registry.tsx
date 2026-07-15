@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { OverviewPage } from './overview/OverviewPage';
 import { MasterCalendarPage } from './calendar/MasterCalendarPage';
+import { ReportsPage } from './reports/ReportsPage';
 import { RcsaDashboard } from './rcsa/RcsaDashboard';
 import { AssetCataloguePage } from './rcsa/AssetCataloguePage';
 import { RiskCataloguePage } from './rcsa/RiskCataloguePage';
@@ -64,6 +65,15 @@ export const MODULES: ModuleDef[] = [
     status: 'active',
     description: 'Centralized schedule tracking all compliance deadlines, risk treatments, renewals, and overdues.',
     Component: MasterCalendarPage,
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: 'doc',
+    group: 'Overview',
+    status: 'active',
+    description: 'Build a board-ready status report and print / save it as PDF.',
+    Component: ReportsPage,
   },
   {
     id: 'rcsa-dashboard',

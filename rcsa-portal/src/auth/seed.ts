@@ -51,6 +51,7 @@ export const SEED_USERS: StoredUser[] = [
     overrides: {
       overview: 'viewer', // executive dashboard is visible to everyone with a login
       'master-calendar': 'viewer', // the shared calendar is visible to everyone with a login
+      reports: 'viewer', // report builder is read-only aggregation, visible to everyone
       'access-reviews': 'editor',
       vendors: 'editor',
       'rcsa-dashboard': 'viewer',

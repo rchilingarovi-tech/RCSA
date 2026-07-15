@@ -166,3 +166,17 @@ button:disabled { filter: none; opacity: 0.5; }
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   button:hover { filter: none !important; }
 }
+
+/* ── Print / PDF export (Reports module) ─────────────────────────────────────── */
+@media print {
+  .no-print, .app-sidebar, .app-header { display: none !important; }
+  .h-screen { height: auto !important; }
+  .overflow-hidden { overflow: visible !important; }
+  main { overflow: visible !important; }
+  body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rep-sec { break-inside: avoid; }
+  #report-root { border: none !important; box-shadow: none !important; max-width: none !important; border-radius: 0 !important; }
+  #report-root > div { padding: 0 !important; }
+  @page { margin: 14mm; }
+}
