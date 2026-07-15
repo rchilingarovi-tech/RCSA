@@ -2,7 +2,7 @@
 // Read-only and shell-level: it reads each standalone repo independently — it does
 // NOT couple the modules to each other.
 import type { Treatment } from '../../data/models';
-import { isOverdue, today } from '../../domain/scoring';
+import { isOverdue, today, todayPlus } from '../../domain/scoring';
 import { vendorRepo } from '../../modules/vendors/repo';
 import { policyRepo } from '../../modules/policies/repo';
 import { reviewDue } from '../../modules/policies/types';
@@ -37,7 +37,7 @@ export function buildNotifications(treatments: Treatment[]): AppNotification[] {
   }
 
   const vendors = vendorRepo.list();
-  const in120 = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
+  const in120 = todayPlus(120);
   const expired = vendors.filter((v) => v.contractExpiry < today()).length;
   const renewing = vendors.filter((v) => v.contractExpiry >= today() && v.contractExpiry <= in120).length;
   if (expired) out.push({ id: 'ven-expired', moduleId: 'vendors', icon: 'building', k: 'crit', title: 'Vendor contracts expired', body: `${plural(expired, 'contract')} have lapsed.` });

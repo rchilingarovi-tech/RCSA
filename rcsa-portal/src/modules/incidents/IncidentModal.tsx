@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { useUi } from '../../components/common/UiProvider';
+import { today } from '../../domain/scoring';
 import { incidentRepo } from './repo';
 import {
   CATEGORIES,
+  nowLocal,
   INCIDENT_STATUSES,
   SEVERITIES,
   type Incident,
@@ -12,8 +14,8 @@ import {
   type Severity,
 } from './types';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const nowLocal = () => new Date().toISOString().slice(0, 16);
+const todayStr = today;
+
 
 export function IncidentModal({ incident, onClose, onSave }: { incident: Incident | 'new'; onClose: () => void; onSave: (i: Incident) => void }) {
   const ui = useUi();

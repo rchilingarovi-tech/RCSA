@@ -1,3 +1,4 @@
+import { today } from '../../domain/scoring';
 // Daily snapshot of the portal's headline metrics — so the Main Dashboard can show
 // REAL trend deltas ("vs previous period") instead of fabricated ones. One record
 // per calendar day; the delta compares today against the most recent prior day.
@@ -22,7 +23,7 @@ const KEY = 'infosec.overview.snapshots.v1';
 const CAP = 180; // ~6 months of daily points
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return today();
 }
 
 function read(): OverviewSnapshot[] {

@@ -17,6 +17,7 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
+import { today } from '../../domain/scoring';
 import { findingsRepo } from './repo';
 import {
   FINDING_SEVERITIES,
@@ -34,7 +35,7 @@ import {
   type FindingStatus,
 } from './types';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = today;
 
 function FindingModal({ finding, onClose, onSave }: { finding: Finding | 'new'; onClose: () => void; onSave: (f: Finding) => void }) {
   const ui = useUi();

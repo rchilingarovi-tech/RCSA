@@ -17,11 +17,11 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { today } from '../../domain/scoring';
+import { today, todayPlus } from '../../domain/scoring';
 import { policyRepo } from './repo';
 import { DOC_STATUSES, DOC_TYPES, statusToken, typeToken, type DocStatus, type DocType, type PolicyDoc } from './types';
 
-const iso = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const iso = todayPlus;
 const STATUS_TONE = statusToken as Record<DocStatus, Tone>;
 const TYPE_TONE = typeToken as Record<DocType, Tone>;
 

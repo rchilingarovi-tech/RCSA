@@ -2,10 +2,25 @@ import type { Asset, Risk, Treatment } from '../data/models';
 
 // Pure domain logic — ported verbatim from the prototype (New Version.html L544-548).
 
-/** Today's date in ISO (YYYY-MM-DD). A function (not a module-load constant) so
- *  long-lived tabs never evaluate overdue/expiry logic against a stale date. */
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** Format a Date as LOCAL YYYY-MM-DD (never toISOString — that is UTC, which in
+ *  GMT+4 puts 00:00–04:00 on yesterday's date). */
+export function localIso(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Today's date in local ISO (YYYY-MM-DD). A function (not a module-load
+ *  constant) so long-lived tabs never evaluate overdue logic against a stale date. */
 export function today(): string {
-  return new Date().toISOString().split('T')[0];
+  return localIso(new Date());
+}
+
+/** Local ISO date `days` from today (review / renewal windows). */
+export function todayPlus(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return localIso(d);
 }
 
 export function assetValue(a: Pick<Asset, 'c' | 'i' | 'a'>): number {

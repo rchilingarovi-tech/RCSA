@@ -36,6 +36,13 @@ export interface Incident {
   closedAt: string; // YYYY-MM-DD, empty until closed
 }
 
+/** Local datetime for datetime-local inputs (YYYY-MM-DDTHH:mm) — never UTC. */
+export function nowLocal(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 /** Display label for a category, expanding 'Other' with its free-text detail. */
 export function categoryLabel(i: Pick<Incident, 'category' | 'categoryOther'>): string {
   return i.category === 'Other' && i.categoryOther ? `Other — ${i.categoryOther}` : i.category;

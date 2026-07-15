@@ -17,7 +17,7 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
-import { today } from '../../domain/scoring';
+import { today, todayPlus } from '../../domain/scoring';
 import { vendorRepo } from './repo';
 import {
   CERT_OPTIONS,
@@ -30,7 +30,7 @@ import {
   type Vendor,
 } from './types';
 
-const iso = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const iso = todayPlus;
 const CRIT_TONE = criticalityToken as Record<Criticality, Tone>;
 
 // ── Add / edit modal ──────────────────────────────────────────────────────────

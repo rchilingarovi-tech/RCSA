@@ -1,7 +1,7 @@
 // Vulnerability / Pentest Findings — standalone module. Own model + storage.
 // Finding-level remediation tracking with SEVERITY-BASED SLAs: the deadline is
 // DERIVED (discovered + SLA days), so it can never drift from the policy.
-import { today } from '../../domain/scoring';
+import { localIso, today } from '../../domain/scoring';
 
 export const VULN_SOURCES = ['Vulnerability Scan', 'Penetration Test', 'Red Team', 'Bug Bounty'] as const;
 export type VulnSource = (typeof VULN_SOURCES)[number];
@@ -37,8 +37,12 @@ export const sourceTone: Record<VulnSource, string> = { 'Vulnerability Scan': 'i
 /** Open = still needs remediation. Risk Accepted / Resolved end the SLA clock. */
 export const isOpenVuln = (v: Pick<Vuln, 'status'>): boolean => v.status === 'Open' || v.status === 'In Remediation';
 
-const addDays = (iso: string, days: number): string =>
-  new Date(new Date(`${iso}T00:00:00`).getTime() + days * 86400000).toISOString().slice(0, 10);
+// Local date math — toISOString() is UTC and shifts GMT+4 deadlines a day early.
+const addDays = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return localIso(d);
+};
 
 /** SLA deadline derived from discovery date + severity policy ('' when undated). */
 export function slaDeadline(v: Pick<Vuln, 'discovered' | 'severity'>): string {

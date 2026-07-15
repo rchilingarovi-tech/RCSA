@@ -15,6 +15,7 @@ import {
   type DonutSegment,
   type Tone,
 } from '../../components/charts/primitives';
+import { today } from '../../domain/scoring';
 import { vulnRepo } from './repo';
 import {
   SLA_DAYS,
@@ -34,7 +35,7 @@ import {
   type VulnStatus,
 } from './types';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = today;
 
 function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () => void; onSave: (v: Vuln) => void }) {
   const ui = useUi();

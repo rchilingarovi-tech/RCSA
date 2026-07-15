@@ -1,5 +1,5 @@
 import { parseEnum, type IoSpec } from '../../lib/tableIo';
-import { CATEGORIES, INCIDENT_STATUSES, SEVERITIES, type Incident } from './types';
+import { CATEGORIES, INCIDENT_STATUSES, SEVERITIES, nowLocal, type Incident } from './types';
 
 export const incidentIo: IoSpec<Incident> = {
   entity: 'Incident',
@@ -28,7 +28,7 @@ export const incidentIo: IoSpec<Incident> = {
     return {
       id: d.id,
       shortDesc: d.shortDesc ?? prev?.shortDesc ?? '',
-      reportedAt: d.reportedAt ?? prev?.reportedAt ?? new Date().toISOString().slice(0, 16),
+      reportedAt: d.reportedAt ?? prev?.reportedAt ?? nowLocal(),
       occurredAt: d.occurredAt ?? prev?.occurredAt ?? '',
       reportedBy: d.reportedBy ?? prev?.reportedBy ?? '',
       category: d.category ?? prev?.category ?? 'Other',
