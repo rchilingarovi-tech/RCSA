@@ -20,6 +20,15 @@ import { riskStatus, isOverdue } from '../../domain/scoring';
 
 // UI preference only (not business data). Validated against the registry on read.
 const ACTIVE_KEY = 'infosec.activeModule';
+const COLLAPSE_KEY = 'infosec.sidebarCollapsed';
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function readActiveId(): string {
   try {
@@ -48,6 +57,7 @@ export function AppShell() {
   const { theme, toggleTheme } = useTheme();
   const [activeId, setActiveId] = useState<string>(readActiveId);
   const [navOpen, setNavOpen] = useState(false); // mobile drawer
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed); // desktop icon-rail
   const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -58,6 +68,14 @@ export function AppShell() {
       /* ignore persistence failure */
     }
   }, [activeId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch {
+      /* ignore persistence failure */
+    }
+  }, [collapsed]);
 
   const active = getModule(activeId) ?? getModule(DEFAULT_MODULE_ID)!;
 
@@ -103,12 +121,23 @@ export function AppShell() {
           type="button"
           onClick={() => select(m.id)}
           aria-current={m.id === active.id ? 'page' : undefined}
-          className={`nav-item w-full flex items-center gap-2.5 text-left ${m.id === active.id ? 'is-active' : ''}`}
+          title={collapsed ? m.label : undefined}
+          className={`nav-item relative w-full flex items-center text-left ${collapsed ? 'lg:justify-center gap-2.5 lg:gap-0' : 'gap-2.5'} ${m.id === active.id ? 'is-active' : ''}`}
         >
           <span className="nav-icon" aria-hidden><Icon name={m.icon} size={17} /></span>
-          <span className="flex-1 truncate">{m.label}</span>
-          {m.status === 'planned' && <span className="soon-tag text-[8px] font-bold uppercase">Soon</span>}
-          {badge && <span className={`nav-badge ${badge.alert ? 'alert' : ''}`}>{badge.value}</span>}
+          <span className={`flex-1 truncate ${collapsed ? 'lg:hidden' : ''}`}>{m.label}</span>
+          {m.status === 'planned' && <span className={`soon-tag text-[8px] font-bold uppercase ${collapsed ? 'lg:hidden' : ''}`}>Soon</span>}
+          {badge && (
+            <>
+              <span className={`nav-badge ${badge.alert ? 'alert' : ''} ${collapsed ? 'lg:hidden' : ''}`}>{badge.value}</span>
+              {/* Collapsed rail: a dot instead of the number so the count still signals */}
+              <span
+                className={`hidden ${collapsed ? 'lg:block' : ''} absolute top-1.5 right-1.5 w-2 h-2 rounded-full`}
+                style={{ background: badge.alert ? 'var(--crit)' : 'var(--accent)' }}
+                aria-hidden
+              />
+            </>
+          )}
         </button>
       </li>
     );
@@ -126,10 +155,11 @@ export function AppShell() {
         {/* Sidebar */}
         <aside
           className={`app-sidebar fixed lg:static z-40 inset-y-0 left-0 w-[248px] shrink-0 flex flex-col
-            overflow-y-auto transition-transform duration-200
+            overflow-y-auto overflow-x-hidden transition-all duration-200
+            ${collapsed ? 'lg:w-[68px]' : 'lg:w-[248px]'}
             ${navOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
         >
-          <div className="px-5 py-4 flex items-center gap-3 border-b" style={{ borderColor: 'var(--side-border)' }}>
+          <div className={`py-4 flex items-center gap-3 border-b ${collapsed ? 'lg:px-0 lg:justify-center px-5' : 'px-5'}`} style={{ borderColor: 'var(--side-border)' }}>
             <span
               className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
               style={{ background: 'linear-gradient(135deg,#0d9488,#2dd4bf)', color: '#04211d' }}
@@ -138,7 +168,7 @@ export function AppShell() {
                 <path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" /><path d="M9 12l2 2 4-4" />
               </svg>
             </span>
-            <div className="leading-tight">
+            <div className={`leading-tight ${collapsed ? 'lg:hidden' : ''}`}>
               <div className="brand text-[15px]">InfoSec Portal</div>
               <p className="brand-sub text-[11px]">Information Security platform</p>
             </div>
@@ -150,9 +180,11 @@ export function AppShell() {
               if (items.length === 0) return null;
               return (
                 <div key={group}>
-                  <p className="nav-group-label px-2 mb-1.5 text-[10px] font-bold uppercase tracking-wider">
+                  <p className={`nav-group-label px-2 mb-1.5 text-[10px] font-bold uppercase tracking-wider ${collapsed ? 'lg:hidden' : ''}`}>
                     {group}
                   </p>
+                  {/* Collapsed rail: a slim divider stands in for the hidden group label */}
+                  {collapsed && <div className="hidden lg:block mx-auto w-6 border-t mb-1.5" style={{ borderColor: 'var(--side-border)' }} />}
                   <ul className="space-y-0.5">{items.map(renderItem)}</ul>
                 </div>
               );
@@ -176,6 +208,17 @@ export function AppShell() {
               className="hdr-btn lg:hidden"
             >
               ☰
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hdr-btn hidden lg:inline-flex"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
+                <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d="M15 10l-2 2 2 2" />
+              </svg>
             </button>
             <div className="min-w-0">
               <div className="text-[16px] font-bold tracking-tight truncate" style={{ color: 'var(--text)' }}>
