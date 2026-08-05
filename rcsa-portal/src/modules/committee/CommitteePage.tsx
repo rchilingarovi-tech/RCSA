@@ -34,6 +34,9 @@ function MeetingModal({ meeting, onClose, onSave }: { meeting: Meeting | 'new'; 
   const [attendance, setAttendance] = useState(e?.attendance ?? '');
   const [decisions, setDecisions] = useState(e?.decisions ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a meeting title.', 'bg-orange-600'); return; }
@@ -44,8 +47,8 @@ function MeetingModal({ meeting, onClose, onSave }: { meeting: Meeting | 'new'; 
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Meeting — ${e.id}` : 'New Meeting'} subtitle="Committee meeting record" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Meeting — ${e.id}` : 'New Meeting'} subtitle="Committee meeting record" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. InfoSec Steering Committee — Q3" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} className={field} /></div>
@@ -101,9 +104,8 @@ export function CommitteePage() {
   const pager = usePaged(rows);
 
   const save = (m: Meeting) => { setMeetings(committeeRepo.save(m)); setEditing(null); ui.toast('Meeting saved', 'bg-green-700'); };
-  const del = (m: Meeting) => ui.confirm(`Delete "${m.title}"?`, 'This cannot be undone.', () => { setMeetings(committeeRepo.remove(m.id)); ui.toast('Meeting deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample meetings and discards your changes.', () => { setMeetings(committeeRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (m: Meeting) => ui.confirm(`Delete "${m.title}"?`, 'You can undo this immediately afterwards.', () => { setMeetings(committeeRepo.remove(m.id)); ui.toast('Meeting deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setMeetings(committeeRepo.save(m)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample meetings and discards your changes.', () => { setMeetings(committeeRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Meetings logged', v: meetings.length },
     { l: 'Upcoming', v: meetings.filter((m) => m.status === 'Scheduled').length, t: 'info' },

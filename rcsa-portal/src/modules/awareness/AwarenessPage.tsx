@@ -31,6 +31,9 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
   const [due, setDue] = useState(e?.due ?? today());
   const [completion, setCompletion] = useState(String(e?.completion ?? '0'));
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!name.trim()) { ui.toast('Enter a course / campaign name.', 'bg-orange-600'); return; }
@@ -42,8 +45,8 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Course — ${e.id}` : 'New Course / Campaign'} subtitle="Awareness training item" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Course — ${e.id}` : 'New Course / Campaign'} subtitle="Awareness training item" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Course / campaign *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Annual security awareness 2026" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label className={lbl}>Type</label><select value={type} onChange={(ev) => setType(ev.target.value as CourseType)} className={field}>{COURSE_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
@@ -101,9 +104,8 @@ export function AwarenessPage() {
   const pager = usePaged(rows);
 
   const save = (c: Course) => { setCourses(awarenessRepo.save(c)); setEditing(null); ui.toast('Course saved', 'bg-green-700'); };
-  const del = (c: Course) => ui.confirm(`Delete "${c.course}"?`, 'This cannot be undone.', () => { setCourses(awarenessRepo.remove(c.id)); ui.toast('Course deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample courses and discards your changes.', () => { setCourses(awarenessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (c: Course) => ui.confirm(`Delete "${c.course}"?`, 'You can undo this immediately afterwards.', () => { setCourses(awarenessRepo.remove(c.id)); ui.toast('Course deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setCourses(awarenessRepo.save(c)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample courses and discards your changes.', () => { setCourses(awarenessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Active items', v: courses.length },
     { l: 'Avg completion', v: `${avg}%`, t: 'ok' },

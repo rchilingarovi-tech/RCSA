@@ -55,6 +55,9 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
   const [description, setDescription] = useState(e?.description ?? '');
   const [remediation, setRemediation] = useState(e?.remediation ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a vulnerability title.', 'bg-orange-600'); return; }
@@ -86,8 +89,8 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
   const deadline = discovered ? slaDeadline({ discovered, severity }) : '';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Vulnerability — ${e.id}` : 'New Vulnerability'} subtitle="Scan / pentest finding" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Vulnerability — ${e.id}` : 'New Vulnerability'} subtitle="Scan / pentest finding" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. SQL injection in loan-application search" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as VulnSource)} className={field}>{VULN_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
@@ -162,9 +165,8 @@ export function VulnsPage() {
   const selected = selectedId ? vulns.find((v) => v.id === selectedId) ?? null : null;
 
   const save = (v: Vuln) => { setVulns(vulnRepo.save(v)); setEditing(null); ui.toast('Vulnerability saved', 'bg-green-700'); };
-  const del = (v: Vuln) => ui.confirm(`Delete "${v.id}"?`, 'This cannot be undone.', () => { setVulns(vulnRepo.remove(v.id)); ui.toast('Vulnerability deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vulnerabilities and discards your changes.', () => { setVulns(vulnRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (v: Vuln) => ui.confirm(`Delete "${v.id}"?`, 'You can undo this immediately afterwards.', () => { setVulns(vulnRepo.remove(v.id)); ui.toast('Vulnerability deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setVulns(vulnRepo.save(v)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vulnerabilities and discards your changes.', () => { setVulns(vulnRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Vulnerabilities', v: vulns.length },
     { l: 'Open', v: open.length, t: 'high' },

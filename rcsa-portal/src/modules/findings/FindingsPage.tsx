@@ -53,6 +53,9 @@ function FindingModal({ finding, onClose, onSave }: { finding: Finding | 'new'; 
   const [description, setDescription] = useState(e?.description ?? '');
   const [actionPlan, setActionPlan] = useState(e?.actionPlan ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a finding title.', 'bg-orange-600'); return; }
@@ -76,8 +79,8 @@ function FindingModal({ finding, onClose, onSave }: { finding: Finding | 'new'; 
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Finding — ${e.id}` : 'New Finding'} subtitle="Audit / regulator finding" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Finding — ${e.id}` : 'New Finding'} subtitle="Audit / regulator finding" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Privileged access reviews not performed quarterly" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as FindingSource)} className={field}>{FINDING_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
@@ -145,9 +148,8 @@ export function FindingsPage() {
   const selected = selectedId ? findings.find((f) => f.id === selectedId) ?? null : null;
 
   const save = (f: Finding) => { setFindings(findingsRepo.save(f)); setEditing(null); ui.toast('Finding saved', 'bg-green-700'); };
-  const del = (f: Finding) => ui.confirm(`Delete "${f.id}"?`, 'This cannot be undone.', () => { setFindings(findingsRepo.remove(f.id)); ui.toast('Finding deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample findings and discards your changes.', () => { setFindings(findingsRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (f: Finding) => ui.confirm(`Delete "${f.id}"?`, 'You can undo this immediately afterwards.', () => { setFindings(findingsRepo.remove(f.id)); ui.toast('Finding deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setFindings(findingsRepo.save(f)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample findings and discards your changes.', () => { setFindings(findingsRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const open = findings.filter(isOpenFinding);
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Findings', v: findings.length },

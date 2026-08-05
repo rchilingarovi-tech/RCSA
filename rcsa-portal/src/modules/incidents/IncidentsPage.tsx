@@ -52,7 +52,7 @@ export function IncidentsPage() {
   const selected = selectedId ? incidents.find((i) => i.id === selectedId) ?? null : null;
 
   const save = (i: Incident) => { setIncidents(incidentRepo.save(i)); setEditing(null); ui.toast('Incident saved', 'bg-green-700'); };
-  const del = (i: Incident) => ui.confirm(`Delete "${i.id}"?`, 'This cannot be undone.', () => { setIncidents(incidentRepo.remove(i.id)); setSelectedId(null); ui.toast('Incident deleted', 'bg-red-700'); });
+  const del = (i: Incident) => ui.confirm(`Delete "${i.id}"?`, 'You can undo this immediately afterwards.', () => { setIncidents(incidentRepo.remove(i.id)); setSelectedId(null); ui.toast('Incident deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setIncidents(incidentRepo.save(i)) } }); });
   const openEdit = (i: Incident) => { setSelectedId(null); setEditing(i); };
 
   const ttc = selected ? timeToClosureDays(selected) : null;
@@ -64,7 +64,7 @@ export function IncidentsPage() {
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow">+ Report Incident</button>}
         {perms.remove && (
           <button
-            onClick={() => ui.confirm('Reset demo data?', 'Restores the original sample incidents and discards your changes.', () => { setIncidents(incidentRepo.reset()); setSelectedId(null); ui.toast('Demo data restored', 'bg-green-700'); })}
+            onClick={() => ui.confirm('Reset demo data?', 'Restores the original sample incidents and discards your changes.', () => { setIncidents(incidentRepo.reset()); setSelectedId(null); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' })}
             className="btn-neutral bg-white border px-3 py-2 rounded text-sm"
           >
             Reset demo data

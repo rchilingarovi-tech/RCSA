@@ -35,6 +35,9 @@ function PolicyModal({ doc, onClose, onSave }: { doc: PolicyDoc | 'new'; onClose
   const [owner, setOwner] = useState(e?.owner ?? '');
   const [nextReview, setNextReview] = useState(e?.nextReview ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a document title.', 'bg-orange-600'); return; }
@@ -45,8 +48,8 @@ function PolicyModal({ doc, onClose, onSave }: { doc: PolicyDoc | 'new'; onClose
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Document — ${e.id}` : 'New Document'} subtitle="Policy / document record" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Document — ${e.id}` : 'New Document'} subtitle="Policy / document record" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Access Control Standard" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><label className={lbl}>Type</label><select value={type} onChange={(ev) => setType(ev.target.value as DocType)} className={field}>{DOC_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
@@ -113,9 +116,8 @@ export function PoliciesPage() {
   const pager = usePaged(rows);
 
   const save = (d: PolicyDoc) => { setDocs(policyRepo.save(d)); setEditing(null); ui.toast('Document saved', 'bg-green-700'); };
-  const del = (d: PolicyDoc) => ui.confirm(`Delete "${d.title}"?`, 'This cannot be undone.', () => { setDocs(policyRepo.remove(d.id)); ui.toast('Document deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample documents and discards your changes.', () => { setDocs(policyRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (d: PolicyDoc) => ui.confirm(`Delete "${d.title}"?`, 'You can undo this immediately afterwards.', () => { setDocs(policyRepo.remove(d.id)); ui.toast('Document deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setDocs(policyRepo.save(d)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample documents and discards your changes.', () => { setDocs(policyRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'Documents', v: docs.length },
     { l: 'Approved', v: docs.filter((d) => d.status === 'Approved').length, t: 'low' },

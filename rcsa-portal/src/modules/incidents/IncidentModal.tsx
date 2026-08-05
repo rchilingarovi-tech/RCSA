@@ -36,6 +36,9 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
   const [rootCause, setRootCause] = useState(e?.rootCause ?? '');
   const [correctiveAction, setCorrectiveAction] = useState(e?.correctiveAction ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!shortDesc.trim()) { ui.toast('Enter a short description.', 'bg-orange-600'); return; }
@@ -71,8 +74,8 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Incident — ${e.id}` : 'Report New Incident'} subtitle="Security incident record" maxWidth="max-w-2xl">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Incident — ${e.id}` : 'Report New Incident'} subtitle="Security incident record" maxWidth="max-w-2xl">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Short description *</label><input value={shortDesc} maxLength={200} onChange={(ev) => setShortDesc(ev.target.value)} className={field} placeholder="e.g. Phishing campaign targeting finance team" /></div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

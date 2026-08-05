@@ -29,6 +29,9 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
   const [due, setDue] = useState(e?.due ?? today());
   const [progress, setProgress] = useState(String(e?.progress ?? '0'));
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!campaign.trim()) { ui.toast('Enter a campaign name.', 'bg-orange-600'); return; }
@@ -40,8 +43,8 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Campaign — ${e.id}` : 'New Access Review'} subtitle="Entitlement review campaign" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Campaign — ${e.id}` : 'New Access Review'} subtitle="Entitlement review campaign" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Campaign *</label><input value={campaign} maxLength={200} onChange={(ev) => setCampaign(ev.target.value)} className={field} placeholder="e.g. Q2 privileged access review" /></div>
         <div><label className={lbl}>Scope</label><input value={scope} maxLength={200} onChange={(ev) => setScope(ev.target.value)} className={field} placeholder="What is being reviewed" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -101,9 +104,8 @@ export function AccessPage() {
   const pager = usePaged(rows);
 
   const save = (r: AccessReview) => { setReviews(accessRepo.save(r)); setEditing(null); ui.toast('Campaign saved', 'bg-green-700'); };
-  const del = (r: AccessReview) => ui.confirm(`Delete "${r.campaign}"?`, 'This cannot be undone.', () => { setReviews(accessRepo.remove(r.id)); ui.toast('Campaign deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample campaigns and discards your changes.', () => { setReviews(accessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (r: AccessReview) => ui.confirm(`Delete "${r.campaign}"?`, 'You can undo this immediately afterwards.', () => { setReviews(accessRepo.remove(r.id)); ui.toast('Campaign deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setReviews(accessRepo.save(r)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample campaigns and discards your changes.', () => { setReviews(accessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const avg = reviews.length ? Math.round(reviews.reduce((s, r) => s + (Number(r.progress) || 0), 0) / reviews.length) : 0;
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Campaigns', v: reviews.length },

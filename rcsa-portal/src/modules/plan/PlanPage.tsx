@@ -32,6 +32,9 @@ function PlanModal({ item, onClose, onSave }: { item: Initiative | 'new'; onClos
   const [priority, setPriority] = useState<Priority>(e?.priority ?? 'Medium');
   const [progress, setProgress] = useState(String(e?.progress ?? '0'));
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!initiative.trim()) { ui.toast('Enter an initiative name.', 'bg-orange-600'); return; }
@@ -43,8 +46,8 @@ function PlanModal({ item, onClose, onSave }: { item: Initiative | 'new'; onClos
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit Initiative — ${e.id}` : 'New Initiative'} subtitle="Annual roadmap item" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Initiative — ${e.id}` : 'New Initiative'} subtitle="Annual roadmap item" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Initiative *</label><input value={initiative} maxLength={200} onChange={(ev) => setInitiative(ev.target.value)} className={field} placeholder="e.g. SIEM detection engineering uplift" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={lbl}>Category</label><select value={category} onChange={(ev) => setCategory(ev.target.value as PlanCategory)} className={field}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
@@ -104,9 +107,8 @@ export function PlanPage() {
   const pager = usePaged(rows);
 
   const save = (i: Initiative) => { setItems(planRepo.save(i)); setEditing(null); ui.toast('Initiative saved', 'bg-green-700'); };
-  const del = (i: Initiative) => ui.confirm(`Delete "${i.initiative}"?`, 'This cannot be undone.', () => { setItems(planRepo.remove(i.id)); ui.toast('Initiative deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample initiatives and discards your changes.', () => { setItems(planRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (i: Initiative) => ui.confirm(`Delete "${i.initiative}"?`, 'You can undo this immediately afterwards.', () => { setItems(planRepo.remove(i.id)); ui.toast('Initiative deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setItems(planRepo.save(i)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample initiatives and discards your changes.', () => { setItems(planRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const avgAll = items.length ? Math.round(items.reduce((s, i) => s + (Number(i.progress) || 0), 0) / items.length) : 0;
   const stats: { l: string; v: string | number; t?: Tone }[] = [
     { l: 'Initiatives', v: items.length },

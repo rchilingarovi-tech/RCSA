@@ -36,6 +36,9 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
   const [direction, setDirection] = useState<Direction>(e?.direction ?? 'Higher is better');
   const [history, setHistory] = useState(e?.history ?? '');
 
+  // Any field change arms the discard guard (change events bubble to the form).
+  const [dirty, setDirty] = useState(false);
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!name.trim()) { ui.toast('Enter a KPI name.', 'bg-orange-600'); return; }
@@ -48,8 +51,8 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
   const lbl = 'text-xs font-semibold text-gray-600 block mb-1';
 
   return (
-    <Modal open onClose={onClose} title={e ? `Edit KPI — ${e.id}` : 'New KPI'} subtitle="Performance metric" maxWidth="max-w-lg">
-      <form onSubmit={submit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit KPI — ${e.id}` : 'New KPI'} subtitle="Performance metric" maxWidth="max-w-lg">
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
         <div><label className={lbl}>Name *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Mean time to contain" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><label className={lbl}>Current *</label><input value={current} onChange={(ev) => setCurrent(ev.target.value)} className={field} inputMode="decimal" /></div>
@@ -155,9 +158,8 @@ export function KpisPage() {
   const pager = usePaged(rows);
 
   const save = (k: Kpi) => { setKpis(kpiRepo.save(k)); setEditing(null); ui.toast('KPI saved', 'bg-green-700'); };
-  const del = (k: Kpi) => ui.confirm(`Delete "${k.name}"?`, 'This cannot be undone.', () => { setKpis(kpiRepo.remove(k.id)); ui.toast('KPI deleted', 'bg-red-700'); });
-  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample KPIs and discards your changes.', () => { setKpis(kpiRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); });
-
+  const del = (k: Kpi) => ui.confirm(`Delete "${k.name}"?`, 'You can undo this immediately afterwards.', () => { setKpis(kpiRepo.remove(k.id)); ui.toast('KPI deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setKpis(kpiRepo.save(k)) } }); });
+  const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample KPIs and discards your changes.', () => { setKpis(kpiRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const stats: { l: string; v: number; t?: Tone }[] = [
     { l: 'KPIs tracked', v: kpis.length },
     { l: 'On track', v: kpis.filter((k) => rag(k) === 'low').length, t: 'low' },
