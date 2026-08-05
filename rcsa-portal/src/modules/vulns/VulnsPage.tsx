@@ -16,7 +16,9 @@ import {
   type Tone,
 } from '../../components/charts/primitives';
 import { today } from '../../domain/scoring';
-import { takeIntent } from '../../lib/intent';
+import { takeIntent, takeOpenIntent } from '../../lib/intent';
+import { RecordDrawer } from '../../components/common/RecordDrawer';
+import { Icon } from '../../components/common/Icon';
 import { vulnRepo } from './repo';
 import {
   SLA_DAYS,
@@ -118,6 +120,8 @@ export function VulnsPage() {
   const perms = usePermissions('vulns');
   const [vulns, setVulns] = useState<Vuln[]>(() => vulnRepo.list());
   const [editing, setEditing] = useState<Vuln | 'new' | null>(() => (takeIntent('new:vulns') ? 'new' : null));
+  // Drill-through from the dashboard/calendar lands here with a record id.
+  const [selectedId, setSelectedId] = useState<string | null>(() => takeOpenIntent('vulns'));
   const [q, setQ] = useState('');
   const filter = useChartFilter<Vuln>();
 
@@ -155,6 +159,7 @@ export function VulnsPage() {
   }, [vulns, q]);
   const rows = filter.apply(searched);
   const pager = usePaged(rows);
+  const selected = selectedId ? vulns.find((v) => v.id === selectedId) ?? null : null;
 
   const save = (v: Vuln) => { setVulns(vulnRepo.save(v)); setEditing(null); ui.toast('Vulnerability saved', 'bg-green-700'); };
   const del = (v: Vuln) => ui.confirm(`Delete "${v.id}"?`, 'This cannot be undone.', () => { setVulns(vulnRepo.remove(v.id)); ui.toast('Vulnerability deleted', 'bg-red-700'); });
@@ -251,7 +256,7 @@ export function VulnsPage() {
                 const left = slaDaysLeft(v);
                 const openItem = isOpenVuln(v);
                 return (
-                  <tr key={v.id} className="risk-row cursor-pointer" onClick={() => perms.edit && setEditing(v)}>
+                  <tr key={v.id} className="risk-row cursor-pointer" onClick={() => setSelectedId(v.id)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{v.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[300px] truncate" title={v.title} style={{ color: 'var(--text)' }}>{v.title}</div>
@@ -288,6 +293,53 @@ export function VulnsPage() {
         </div>
         <Pagination page={pager.page} pageCount={pager.pageCount} pageSize={pager.pageSize} total={pager.total} start={pager.start} onPage={pager.setPage} onPageSize={pager.setPageSize} />
       </div>
+
+      {selected && (
+        <RecordDrawer
+          open
+          onClose={() => setSelectedId(null)}
+          title={`${selected.id} — ${selected.title}`}
+          subtitle={`${selected.source}${selected.ref ? ` · ${selected.ref}` : ''}`}
+          icon={<Icon name="alert" size={22} />}
+          badges={
+            <>
+              <Pill text={selected.severity} k={severityTone[selected.severity]} />
+              <Pill text={selected.status} k={statusTone[selected.status]} />
+              {slaBreached(selected) && <Pill text={`SLA breached ${Math.abs(slaDaysLeft(selected) ?? 0)}d`} k="crit" />}
+            </>
+          }
+          fields={[
+            { label: 'Affected asset', value: selected.asset },
+            { label: 'Reference / CVE', value: selected.ref },
+            { label: 'CVSS', value: selected.cvss },
+            { label: 'Discovered', value: selected.discovered },
+            { label: 'SLA deadline', value: slaDeadline(selected) },
+            {
+              label: 'SLA position',
+              value: !isOpenVuln(selected)
+                ? selected.status
+                : (() => {
+                    const left = slaDaysLeft(selected);
+                    if (left == null) return '—';
+                    return left < 0 ? `${-left} days over` : `${left} days left`;
+                  })(),
+            },
+            { label: 'Remediation owner', value: selected.owner },
+            { label: 'Technical detail', value: selected.description, block: true },
+            { label: 'Remediation plan', value: selected.remediation, block: true },
+          ]}
+          footer={
+            perms.edit ? (
+              <button
+                onClick={() => { setSelectedId(null); setEditing(selected); }}
+                className="bg-blue-600 text-white w-full rounded px-3 py-2 text-sm font-semibold"
+              >
+                Edit vulnerability
+              </button>
+            ) : undefined
+          }
+        />
+      )}
 
       {editing && <VulnModal vuln={editing} onClose={() => setEditing(null)} onSave={save} />}
     </div>

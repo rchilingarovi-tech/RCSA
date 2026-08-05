@@ -169,6 +169,7 @@ const PRIORITY_RANK: Record<Priority, number> = { Critical: 3, High: 2, Medium: 
 
 export interface AttentionItem {
   id: string;
+  recordId: string; // the underlying record id, so a drill-through can open it
   priority: Priority;
   label: string;
   source: string; // record id tag, e.g. "RSK-021"
@@ -184,6 +185,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   data.treatments.filter(isOverdue).forEach((t) =>
     out.push({
       id: `att-trt-${t.id}`,
+      recordId: t.id,
       priority: 'Critical',
       label: t.title || 'Treatment plan',
       source: t.riskIds[0] ? `${t.id} · ${t.riskIds[0]}` : t.id,
@@ -199,6 +201,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     .forEach((i) =>
       out.push({
         id: `att-inc-${i.id}`,
+        recordId: i.id,
         priority: i.severity === 'Critical' ? 'Critical' : 'High',
         label: i.shortDesc,
         source: i.id,
@@ -214,6 +217,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     .forEach((r) =>
       out.push({
         id: `att-rsk-${r.id}`,
+        recordId: r.id,
         priority: 'High',
         label: r.threat,
         source: r.id,
@@ -229,6 +233,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   data.vulns.filter(slaBreached).forEach((v) =>
     out.push({
       id: `att-vul-${v.id}`,
+      recordId: v.id,
       priority: v.severity === 'Critical' || v.severity === 'High' ? 'Critical' : 'High',
       label: `SLA breach: ${v.title}`,
       source: v.id,
@@ -244,6 +249,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   data.findings.filter(findingOverdue).forEach((f) =>
     out.push({
       id: `att-fnd-${f.id}`,
+      recordId: f.id,
       priority: f.severity === 'Critical' || f.severity === 'High' ? 'Critical' : 'High',
       label: `${f.source}: ${f.title}`,
       source: f.id,
@@ -257,6 +263,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   data.accessReviews.filter(accessOverdue).forEach((a) =>
     out.push({
       id: `att-acr-${a.id}`,
+      recordId: a.id,
       priority: 'High',
       label: a.campaign,
       source: a.id,
@@ -272,6 +279,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     .forEach((v) =>
       out.push({
         id: `att-ven-${v.id}`,
+        recordId: v.id,
         priority: 'High',
         label: `${v.name} — contract lapsed`,
         source: v.id,
@@ -287,6 +295,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     .forEach((p) =>
       out.push({
         id: `att-pol-${p.id}`,
+        recordId: p.id,
         priority: 'Medium',
         label: `Review overdue: ${p.title}`,
         source: p.id,
@@ -302,6 +311,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
     .forEach((k) =>
       out.push({
         id: `att-kpi-${k.id}`,
+        recordId: k.id,
         priority: 'Medium',
         label: `${k.name} off track`,
         source: k.id,
@@ -315,6 +325,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
   data.courses.filter(courseOverdue).forEach((c) =>
     out.push({
       id: `att-trn-${c.id}`,
+      recordId: c.id,
       priority: 'Medium',
       label: `Training overdue: ${c.course}`,
       source: c.id,
@@ -335,6 +346,7 @@ export function buildAttentionItems(data: OverviewData): AttentionItem[] {
 // ── Upcoming reviews & deadlines (forward-looking) ───────────────────────────
 export interface UpcomingItem {
   id: string;
+  recordId: string; // the underlying record id, so a drill-through can open it
   icon: string;
   title: string;
   subtext: string;
@@ -356,43 +368,43 @@ export function buildUpcoming(data: OverviewData, horizonDays: number): Upcoming
   data.policies
     .filter((p) => p.status !== 'Retired' && p.nextReview)
     .forEach((p) =>
-      push({ id: `up-pol-${p.id}`, icon: 'doc', title: `Review: ${p.title}`, subtext: `${p.type} · ${p.owner || 'Unassigned'}`, date: p.nextReview, moduleId: 'policies' }),
+      push({ id: `up-pol-${p.id}`, recordId: p.id, icon: 'doc', title: `Review: ${p.title}`, subtext: `${p.type} · ${p.owner || 'Unassigned'}`, date: p.nextReview, moduleId: 'policies' }),
     );
 
   data.accessReviews
     .filter((a) => a.progress < 100 && a.due)
     .forEach((a) =>
-      push({ id: `up-acr-${a.id}`, icon: 'key', title: `Access Review – ${a.campaign}`, subtext: `${a.scope} · ${a.progress}% done`, date: a.due, moduleId: 'access-reviews' }),
+      push({ id: `up-acr-${a.id}`, recordId: a.id, icon: 'key', title: `Access Review – ${a.campaign}`, subtext: `${a.scope} · ${a.progress}% done`, date: a.due, moduleId: 'access-reviews' }),
     );
 
   data.vendors
     .filter((v) => v.contractExpiry)
     .forEach((v) =>
-      push({ id: `up-ven-${v.id}`, icon: 'building', title: `${v.name} — contract renewal`, subtext: `${v.criticality} vendor`, date: v.contractExpiry, moduleId: 'vendors' }),
+      push({ id: `up-ven-${v.id}`, recordId: v.id, icon: 'building', title: `${v.name} — contract renewal`, subtext: `${v.criticality} vendor`, date: v.contractExpiry, moduleId: 'vendors' }),
     );
 
   data.meetings
     .filter((m) => m.status === 'Scheduled' && m.date)
     .forEach((m) =>
-      push({ id: `up-mtg-${m.id}`, icon: 'users', title: m.title, subtext: 'Committee meeting', date: m.date, moduleId: 'committee' }),
+      push({ id: `up-mtg-${m.id}`, recordId: m.id, icon: 'users', title: m.title, subtext: 'Committee meeting', date: m.date, moduleId: 'committee' }),
     );
 
   data.courses
     .filter((c) => c.completion < 100 && c.due)
     .forEach((c) =>
-      push({ id: `up-trn-${c.id}`, icon: 'grad', title: c.course, subtext: `${c.audience} · ${c.completion}% done`, date: c.due, moduleId: 'awareness' }),
+      push({ id: `up-trn-${c.id}`, recordId: c.id, icon: 'grad', title: c.course, subtext: `${c.audience} · ${c.completion}% done`, date: c.due, moduleId: 'awareness' }),
     );
 
   data.findings
     .filter((f) => isOpenFinding(f) && f.dueDate)
     .forEach((f) =>
-      push({ id: `up-fnd-${f.id}`, icon: 'edit', title: `Finding: ${f.title}`, subtext: `${f.source} · ${f.owner || 'Unassigned'}`, date: f.dueDate, moduleId: 'findings' }),
+      push({ id: `up-fnd-${f.id}`, recordId: f.id, icon: 'edit', title: `Finding: ${f.title}`, subtext: `${f.source} · ${f.owner || 'Unassigned'}`, date: f.dueDate, moduleId: 'findings' }),
     );
 
   data.vulns
     .filter((v) => isOpenVuln(v) && v.discovered)
     .forEach((v) =>
-      push({ id: `up-vul-${v.id}`, icon: 'alert', title: `Vuln SLA: ${v.title}`, subtext: `${v.severity} · ${v.owner || 'Unassigned'}`, date: slaDeadline(v), moduleId: 'vulns' }),
+      push({ id: `up-vul-${v.id}`, recordId: v.id, icon: 'alert', title: `Vuln SLA: ${v.title}`, subtext: `${v.severity} · ${v.owner || 'Unassigned'}`, date: slaDeadline(v), moduleId: 'vulns' }),
     );
 
   return items.sort((a, b) => a.days - b.days);

@@ -1,10 +1,12 @@
 import { createContext, useContext } from 'react';
 
-// Lets pages trigger navigation (e.g. "Open in Risk Catalogue") without
-// clearing the active filter, so a dashboard drill-down carries its slice.
+// Lets pages trigger navigation without clearing the active filter, so a
+// dashboard drill-down carries its slice. Passing a recordId also carries WHICH
+// record the link was about, so the target page can open it on arrival instead
+// of dropping the user on an unfiltered page 1.
 export interface NavApi {
   activeId: string;
-  navigate(moduleId: string): void;
+  navigate(moduleId: string, recordId?: string): void;
 }
 
 export const NavContext = createContext<NavApi | null>(null);

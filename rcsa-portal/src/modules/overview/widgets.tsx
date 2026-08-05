@@ -126,7 +126,7 @@ export function KpiCard({
 }
 
 // ── CISO attention items table ───────────────────────────────────────────────
-export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOpen: (moduleId: string) => void }) {
+export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOpen: (moduleId: string, recordId?: string) => void }) {
   if (items.length === 0) return <Empty label="No urgent attention items — nothing overdue or off track." />;
   const th = 'text-left px-2 py-2 text-[10px] font-bold uppercase tracking-wider';
   return (
@@ -145,7 +145,7 @@ export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOp
           {items.map((it) => {
             const tone = priorityTone[it.priority];
             return (
-              <tr key={it.id} onClick={() => onOpen(it.moduleId)} className="risk-row cursor-pointer">
+              <tr key={it.id} onClick={() => onOpen(it.moduleId, it.recordId)} className="risk-row cursor-pointer">
                 <td className="pl-5 pr-2 py-2.5 w-px"><Pill text={it.priority} k={tone} /></td>
                 <td className="px-2 py-2.5">
                   <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOp
 const dateTone = (days: number): string => (days < 0 ? 'crit' : days <= 14 ? 'high' : days <= 30 ? 'med' : days <= 90 ? 'info' : 'mut');
 const dateLabel = (days: number): string => (days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? 'Today' : `${days}d`);
 
-export function UpcomingList({ items, onOpen }: { items: UpcomingItem[]; onOpen: (moduleId: string) => void }) {
+export function UpcomingList({ items, onOpen }: { items: UpcomingItem[]; onOpen: (moduleId: string, recordId?: string) => void }) {
   if (items.length === 0) return <Empty label="Nothing due in this window." />;
   return (
     <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
@@ -183,7 +183,7 @@ export function UpcomingList({ items, onOpen }: { items: UpcomingItem[]; onOpen:
         const tone = dateTone(it.days);
         return (
           <li key={it.id}>
-            <button onClick={() => onOpen(it.moduleId)} className="w-full text-left flex items-center gap-3 px-5 py-2.5 risk-row">
+            <button onClick={() => onOpen(it.moduleId, it.recordId)} className="w-full text-left flex items-center gap-3 px-5 py-2.5 risk-row">
               <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `var(--${tone}-bg)`, color: `var(--${tone})` }}>
                 <Icon name={it.icon} size={15} />
               </span>
@@ -201,7 +201,7 @@ export function UpcomingList({ items, onOpen }: { items: UpcomingItem[]; onOpen:
 }
 
 // ── Service health grid (one posture tile per service) ──────────────────────
-export function ServiceHealthGrid({ tiles, onOpen }: { tiles: ServiceTile[]; onOpen: (moduleId: string) => void }) {
+export function ServiceHealthGrid({ tiles, onOpen }: { tiles: ServiceTile[]; onOpen: (moduleId: string, recordId?: string) => void }) {
   return (
     <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-4">
       {tiles.map((t) => (
@@ -228,19 +228,20 @@ export function ServiceHealthGrid({ tiles, onOpen }: { tiles: ServiceTile[]; onO
 // ── Generic watch list (compact id · label · pill · right-text rows) ────────
 export interface WatchRow {
   id: string;
+  recordId: string;
   label: string;
   pill: string;
   pillTone: string;
   right: string;
 }
 
-export function WatchList({ rows, empty, onOpen }: { rows: WatchRow[]; empty: string; onOpen: () => void }) {
+export function WatchList({ rows, empty, onOpen }: { rows: WatchRow[]; empty: string; onOpen: (recordId: string) => void }) {
   if (rows.length === 0) return <Empty label={empty} />;
   return (
     <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
       {rows.map((r) => (
         <li key={r.id}>
-          <button onClick={onOpen} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left risk-row">
+          <button onClick={() => onOpen(r.recordId)} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left risk-row">
             <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: 'var(--accent)' }}>{r.id}</span>
             <span className="min-w-0 flex-1 text-[12.5px] font-medium truncate" title={r.label} style={{ color: 'var(--text)' }}>{r.label}</span>
             <Pill text={r.pill} k={r.pillTone} />

@@ -281,7 +281,7 @@ export function MasterCalendarPage() {
               </div>
             )}
             <button
-              onClick={() => { const m = selected.moduleId; setSelected(null); navigate(m); }}
+              onClick={() => { const { moduleId, id } = selected; setSelected(null); navigate(moduleId, id); }}
               className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: 'var(--accent)' }}
             >

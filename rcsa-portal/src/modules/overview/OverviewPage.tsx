@@ -198,6 +198,7 @@ export function OverviewPage() {
         .slice(0, 6)
         .map((i) => ({
           id: i.id,
+          recordId: i.id,
           label: i.shortDesc,
           pill: i.severity,
           pillTone: severityColor(i.severity),
@@ -277,7 +278,7 @@ export function OverviewPage() {
 
         {/* Panels — drag the ⠿ handle to reorder; the layout persists per user */}
         <ChartGrid sortKey="overview">
-          <Panel title="Top CISO attention items" meta={attention.length > 6 ? `6 of ` : attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} span={6}>
+          <Panel title="Top CISO attention items" meta={attention.length > 6 ? `6 of ${attention.length}` : attention.length} footer="Open master calendar" onFooter={() => navigate('master-calendar')} span={6}>
             <AttentionTable items={attention.slice(0, 6)} onOpen={navigate} />
           </Panel>
           {show('health') && (
@@ -287,7 +288,7 @@ export function OverviewPage() {
           )}
           {show('incidents') && (
             <Panel span={4} title="Open incident watch" footer="View all incidents" onFooter={() => navigate('incidents')}>
-              <WatchList rows={incidentWatch} empty="No open incidents. 🎉" onOpen={() => navigate('incidents')} />
+              <WatchList rows={incidentWatch} empty="No open incidents." onOpen={(id) => navigate('incidents', id)} />
             </Panel>
           )}
           {show('activity') && auditPerms.view && (

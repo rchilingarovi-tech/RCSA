@@ -17,6 +17,7 @@ import { canView } from '../../auth/can';
 import { useStore } from '../../state/AppStore';
 import { useTheme } from '../../state/ThemeProvider';
 import { riskStatus, isOverdue } from '../../domain/scoring';
+import { setOpenIntent } from '../../lib/intent';
 
 // UI preference only (not business data). Validated against the registry on read.
 const ACTIVE_KEY = 'infosec.activeModule';
@@ -102,15 +103,26 @@ export function AppShell() {
   // Real, derived alerts for the header bell (reads each repo independently).
   const notifs = buildNotifications(store.treatments);
 
-  const select = (id: string) => {
-    // Filters are per-page: switching modules drops the dashboard's chart facet
-    // and slicer selections so they never follow into a catalogue page.
-    if (id !== activeId) {
+  /**
+   * Switching modules from the SIDEBAR means "take me to this module fresh", so
+   * the dashboard's chart facet and slicer selections are dropped. A programmatic
+   * drill-down (dashboard item, calendar event, notification) means "take me to
+   * THIS thing" and must preserve the slice it was built from — clearing it there
+   * was throwing away the very context the link existed to carry.
+   */
+  const select = (id: string, opts?: { preserveFilters?: boolean }) => {
+    if (id !== activeId && !opts?.preserveFilters) {
       store.clearGlobalFilter();
       store.patchRiskFilters({ level: '', status: '', assessment: '' });
     }
     setActiveId(id);
     setNavOpen(false);
+  };
+
+  // Drill-through: carry the record id so the target page can open it on arrival.
+  const navigateToRecord = (moduleId: string, recordId?: string) => {
+    if (recordId) setOpenIntent(moduleId, recordId);
+    select(moduleId, { preserveFilters: true });
   };
 
   const renderItem = (m: ModuleDef) => {
@@ -144,7 +156,7 @@ export function AppShell() {
   };
 
   return (
-    <NavContext.Provider value={{ activeId: active.id, navigate: select }}>
+    <NavContext.Provider value={{ activeId: active.id, navigate: navigateToRecord }}>
     <HeaderSlotContext.Provider value={headerSlot}>
       <div className="h-screen flex overflow-hidden">
         {/* Mobile overlay */}

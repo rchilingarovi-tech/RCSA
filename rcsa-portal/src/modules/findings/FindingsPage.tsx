@@ -18,7 +18,9 @@ import {
   type Tone,
 } from '../../components/charts/primitives';
 import { today } from '../../domain/scoring';
-import { takeIntent } from '../../lib/intent';
+import { takeIntent, takeOpenIntent } from '../../lib/intent';
+import { RecordDrawer } from '../../components/common/RecordDrawer';
+import { Icon } from '../../components/common/Icon';
 import { findingsRepo } from './repo';
 import {
   FINDING_SEVERITIES,
@@ -101,6 +103,8 @@ export function FindingsPage() {
   const perms = usePermissions('findings');
   const [findings, setFindings] = useState<Finding[]>(() => findingsRepo.list());
   const [editing, setEditing] = useState<Finding | 'new' | null>(() => (takeIntent('new:findings') ? 'new' : null));
+  // Drill-through from the dashboard/calendar lands here with a record id.
+  const [selectedId, setSelectedId] = useState<string | null>(() => takeOpenIntent('findings'));
   const [q, setQ] = useState('');
   const filter = useChartFilter<Finding>();
 
@@ -138,6 +142,7 @@ export function FindingsPage() {
   }, [findings, q]);
   const rows = filter.apply(searched);
   const pager = usePaged(rows);
+  const selected = selectedId ? findings.find((f) => f.id === selectedId) ?? null : null;
 
   const save = (f: Finding) => { setFindings(findingsRepo.save(f)); setEditing(null); ui.toast('Finding saved', 'bg-green-700'); };
   const del = (f: Finding) => ui.confirm(`Delete "${f.id}"?`, 'This cannot be undone.', () => { setFindings(findingsRepo.remove(f.id)); ui.toast('Finding deleted', 'bg-red-700'); });
@@ -245,7 +250,7 @@ export function FindingsPage() {
               ) : pager.pageItems.map((f) => {
                 const late = overdue(f);
                 return (
-                  <tr key={f.id} className="risk-row cursor-pointer" onClick={() => perms.edit && setEditing(f)}>
+                  <tr key={f.id} className="risk-row cursor-pointer" onClick={() => setSelectedId(f.id)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{f.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[320px] truncate" title={f.title} style={{ color: 'var(--text)' }}>{f.title}</div>
@@ -273,6 +278,42 @@ export function FindingsPage() {
         </div>
         <Pagination page={pager.page} pageCount={pager.pageCount} pageSize={pager.pageSize} total={pager.total} start={pager.start} onPage={pager.setPage} onPageSize={pager.setPageSize} />
       </div>
+
+      {selected && (
+        <RecordDrawer
+          open
+          onClose={() => setSelectedId(null)}
+          title={`${selected.id} — ${selected.title}`}
+          subtitle={`${selected.source}${selected.ref ? ` · ${selected.ref}` : ''}`}
+          icon={<Icon name="edit" size={22} />}
+          badges={
+            <>
+              <Pill text={selected.severity} k={severityTone[selected.severity]} />
+              <Pill text={selected.status} k={statusTone[selected.status]} />
+              {overdue(selected) && <Pill text={`Overdue ${overdueDays(selected)}d`} k="crit" />}
+            </>
+          }
+          fields={[
+            { label: 'Source', value: selected.source },
+            { label: 'Report reference', value: selected.ref },
+            { label: 'Remediation owner', value: selected.owner },
+            { label: 'Due date', value: selected.dueDate },
+            { label: 'Status', value: selected.status },
+            { label: 'Finding', value: selected.description, block: true },
+            { label: 'Remediation action plan', value: selected.actionPlan, block: true },
+          ]}
+          footer={
+            perms.edit ? (
+              <button
+                onClick={() => { setSelectedId(null); setEditing(selected); }}
+                className="bg-blue-600 text-white w-full rounded px-3 py-2 text-sm font-semibold"
+              >
+                Edit finding
+              </button>
+            ) : undefined
+          }
+        />
+      )}
 
       {editing && <FindingModal finding={editing} onClose={() => setEditing(null)} onSave={save} />}
     </div>
