@@ -116,7 +116,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
                   closeConfirm();
                 }}
                 className="px-4 py-2 rounded text-sm font-semibold text-white"
-                style={{ background: danger ? 'var(--crit)' : 'var(--accent)' }}
+                style={{ background: danger ? 'var(--crit)' : 'var(--accent-d)' }}
               >
                 {confirmState.confirmLabel ?? 'Delete'}
               </button>

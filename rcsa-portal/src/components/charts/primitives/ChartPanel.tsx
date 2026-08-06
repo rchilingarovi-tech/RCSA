@@ -126,7 +126,7 @@ export function ChartPanel({ title, span = 4, filterLabel, onClearFilter, childr
           <button
             onClick={onClearFilter}
             className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: 'var(--ok-bg)', color: 'var(--accent)' }}
+            style={{ background: 'var(--ok-bg)', color: 'var(--link)' }}
           >
             Filtered: {filterLabel} ✕
           </button>

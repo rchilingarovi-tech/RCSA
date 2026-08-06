@@ -95,7 +95,7 @@ export function AuditPage() {
                         <div>{e.summary}</div>
                         {e.changes && e.changes.length > 0 && (
                           <details className="mt-1">
-                            <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                            <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--link)' }}>
                               {e.changes.length} field{e.changes.length === 1 ? '' : 's'} {e.action === 'create' ? 'set' : e.action === 'delete' ? 'removed' : 'changed'}
                             </summary>
                             <div className="mt-1.5 space-y-1">

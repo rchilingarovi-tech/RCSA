@@ -174,7 +174,7 @@ export function MasterCalendarPage() {
               </>
             )}
             <div className="text-[17px] font-bold px-2" style={{ color: 'var(--text)' }}>{title}</div>
-            {dated && <button onClick={() => setCursor(new Date(`${todayIso()}T00:00:00`))} className="text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-80" style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}>Today</button>}
+            {dated && <button onClick={() => setCursor(new Date(`${todayIso()}T00:00:00`))} className="text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-80" style={{ borderColor: 'var(--border)', color: 'var(--link)' }}>Today</button>}
           </div>
           <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
             {([['month', 'Month'], ['week', 'Week'], ['day', 'Day'], ['agenda', 'Agenda List']] as const).map(([v, label]) => (
@@ -198,7 +198,7 @@ export function MasterCalendarPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>Service Layers</h3>
                 {layers.size < LAYERS.length && (
-                  <button onClick={allLayers} className="text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>Show all</button>
+                  <button onClick={allLayers} className="text-[11px] font-semibold" style={{ color: 'var(--link)' }}>Show all</button>
                 )}
               </div>
               <div className="space-y-2.5">
@@ -238,7 +238,7 @@ export function MasterCalendarPage() {
                     ))}
                   </div>
                   {overdue.length > 4 && (
-                    <button onClick={() => setView('agenda')} className="w-full text-left px-4 py-2.5 text-[12px] font-semibold border-t hover:opacity-80" style={{ color: 'var(--accent)', borderColor: 'var(--border)' }}>View all overdues →</button>
+                    <button onClick={() => setView('agenda')} className="w-full text-left px-4 py-2.5 text-[12px] font-semibold border-t hover:opacity-80" style={{ color: 'var(--link)', borderColor: 'var(--border)' }}>View all overdues →</button>
                   )}
                 </>
               )}
@@ -329,7 +329,7 @@ function MonthView({ cursorMonth, grouped, onEvent, onMore }: { cursorMonth: Dat
               </div>
               {evs.slice(0, 3).map((e) => <Chip key={e.id} e={e} onClick={onEvent} />)}
               {evs.length > 3 && (
-                <button onClick={() => onMore(c.date)} className="text-[10.5px] font-semibold text-left px-1 hover:underline" style={{ color: 'var(--accent)' }}>+ {evs.length - 3} more</button>
+                <button onClick={() => onMore(c.date)} className="text-[10.5px] font-semibold text-left px-1 hover:underline" style={{ color: 'var(--link)' }}>+ {evs.length - 3} more</button>
               )}
             </div>
           );

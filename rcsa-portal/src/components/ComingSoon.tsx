@@ -7,7 +7,7 @@ import { Icon } from './common/Icon';
 export function ComingSoon({ module }: { module: ModuleDef }) {
   return (
     <div className="section-card p-10 text-center max-w-2xl mx-auto">
-      <div className="mb-4 flex justify-center" style={{ color: 'var(--accent)' }} aria-hidden>
+      <div className="mb-4 flex justify-center" style={{ color: 'var(--link)' }} aria-hidden>
         <Icon name={module.icon} size={44} />
       </div>
       <div className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 mb-3">

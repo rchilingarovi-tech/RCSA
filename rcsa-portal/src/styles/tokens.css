@@ -19,7 +19,7 @@
   --border-strong: #cfdad8;
   --text: #0c1b1a;
   --text2: #485957;
-  --text3: #7d8e8c;
+  --text3: #5c6d6b;
   --accent: #0d9488;
   --accent-d: #0f766e;
   --accent-soft: #d4f2ec;
@@ -33,8 +33,11 @@
   --sidebar-mut: #5f7572;
   --sidebar-active: #2dd4bf;
 
-  --crit: #dc2626;  --high: #ea580c;  --med: #ca8a04;  --low: #16a34a;
-  --info: #0284c7;  --ok: #0d9488;    --mut: #64748b;   --purple: #7c3aed;
+  /* Foregrounds darkened to clear WCAG AA (4.5:1) as pill text on their own
+     -bg tint, as text on white, AND as white-on-fill chart labels. Same hues:
+     this is a contrast correction, not a re-palette. */
+  --crit: #b91c1c;  --high: #b03d0b;  --med: #946005;  --low: #136f35;
+  --info: #0369a1;  --ok: #0e6a63;    --mut: #576475;   --purple: #7c3aed;
   --crit-bg: #fbeaea; --high-bg: #fceee3; --med-bg: #fbf4dd; --low-bg: #e6f4ea;
   --info-bg: #e2f0f9; --ok-bg: #d8f2ed;  --mut-bg: #eef1f4;  --purple-bg: #f1ebfb;
 
@@ -85,7 +88,7 @@
   --focus-border: var(--accent);
   --focus-ring: 0 0 0 3px var(--accent-soft);
 
-  --btn-bg: var(--accent);
+  --btn-bg: var(--accent-d);
   --btn-fg: #ffffff;
   --btn-shadow: var(--shadow);
   --btn-radius: 8px;
@@ -153,7 +156,7 @@
   --border-strong: #2b3e3b;
   --text: #e9f1f0;
   --text2: #9fb3b0;
-  --text3: #6c7e7c;
+  --text3: #7a8d8b;
   --accent: #2dd4bf;
   --accent-d: #14b8a6;
   --accent-soft: rgba(45, 212, 191, .14);

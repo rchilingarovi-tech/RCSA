@@ -258,7 +258,7 @@ export function OverviewPage() {
             <div className="absolute right-0 mt-2 w-56 section-card p-2 z-50">
               {QUICK_ACTIONS.map((a) => (
                 <button key={a.module} onClick={() => { setMenu(null); setIntent(`new:${a.module}`); navigate(a.module); }} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left text-[13px] risk-row" style={{ color: 'var(--text2)' }}>
-                  <span style={{ color: 'var(--accent)' }}><Icon name={a.icon} size={15} /></span>{a.label}
+                  <span style={{ color: 'var(--link)' }}><Icon name={a.icon} size={15} /></span>{a.label}
                 </button>
               ))}
             </div>

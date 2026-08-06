@@ -38,7 +38,7 @@ export function DirectoryPage() {
           <ol className="space-y-1.5">
             {FLOW.map((step, i) => (
               <li key={i} className="flex gap-2.5 text-sm" style={{ color: 'var(--text2)' }}>
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: 'var(--surface3)', color: 'var(--accent)' }}>{i + 1}</span>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: 'var(--surface3)', color: 'var(--link)' }}>{i + 1}</span>
                 {step}
               </li>
             ))}
@@ -62,7 +62,7 @@ export function DirectoryPage() {
               <tbody className="divide-y divide-gray-100">
                 {GROUP_ROLE_MAP.map((g) => (
                   <tr key={g.group} className="risk-row">
-                    <td className="px-4 py-3"><span className="font-mono text-xs font-semibold" style={{ color: 'var(--accent)' }}>{g.group}</span></td>
+                    <td className="px-4 py-3"><span className="font-mono text-xs font-semibold" style={{ color: 'var(--link)' }}>{g.group}</span></td>
                     <td className="px-4 py-3" style={{ color: 'var(--text2)' }}>{g.access}</td>
                   </tr>
                 ))}
@@ -103,7 +103,7 @@ export function DirectoryPage() {
                   </div>
 
                   <details>
-                    <summary className="cursor-pointer text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>
+                    <summary className="cursor-pointer text-[11px] font-semibold" style={{ color: 'var(--link)' }}>
                       Access: {ids.length} of {totalModules} modules
                     </summary>
                     <div className="mt-1.5 flex flex-wrap gap-1">

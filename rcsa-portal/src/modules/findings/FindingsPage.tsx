@@ -224,7 +224,7 @@ export function FindingsPage() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search findings…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
-        {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
+        {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--link)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
         <ImportExport spec={findingIo} exportSource={rows} existing={findings} canImport={perms.create} canExport={perms.export} onImported={(items) => setFindings(findingsRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
@@ -254,7 +254,7 @@ export function FindingsPage() {
                 const late = overdue(f);
                 return (
                   <tr key={f.id} className="risk-row cursor-pointer" {...rowActivation(() => setSelectedId(f.id), `Open ${f.id}: ${f.title}`)}>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{f.id}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--link)' }}>{f.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[320px] truncate" title={f.title} style={{ color: 'var(--text)' }}>{f.title}</div>
                       <div className="text-xs" style={{ color: 'var(--text3)' }}>{f.ref || '—'}</div>

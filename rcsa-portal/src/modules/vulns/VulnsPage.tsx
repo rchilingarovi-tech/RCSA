@@ -248,7 +248,7 @@ export function VulnsPage() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search vulnerabilities…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
-        {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
+        {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--link)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
         <ImportExport spec={vulnIo} exportSource={rows} existing={vulns} canImport={perms.create} canExport={perms.export} onImported={(items) => setVulns(vulnRepo.bulkSave(items))} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
@@ -279,7 +279,7 @@ export function VulnsPage() {
                 const openItem = isOpenVuln(v);
                 return (
                   <tr key={v.id} className="risk-row cursor-pointer" {...rowActivation(() => setSelectedId(v.id), `Open ${v.id}: ${v.title}`)}>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{v.id}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--link)' }}>{v.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[300px] truncate" title={v.title} style={{ color: 'var(--text)' }}>{v.title}</div>
                       <div className="text-xs" style={{ color: 'var(--text3)' }}>{v.asset || '—'}{v.ref ? ` · ${v.ref}` : ''}</div>

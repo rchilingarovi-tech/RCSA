@@ -138,7 +138,7 @@ export function AssetCataloguePage() {
           />
         </div>
         {filter.active && (
-          <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>
+          <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--link)', borderColor: 'var(--accent)' }}>
             Filtered: {filter.active.label} ✕
           </button>
         )}
@@ -174,7 +174,7 @@ export function AssetCataloguePage() {
                 const overdue = !!a.reviewDate && a.reviewDate < today();
                 return (
                   <tr key={a.id} className="risk-row cursor-pointer" {...rowActivation(() => modals.openSummary(a.id), `Open ${a.id}: ${a.name}`)}>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{a.id}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--link)' }}>{a.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold" style={{ color: 'var(--text)' }}>{a.name}</div>
                       <div className="text-xs" style={{ color: 'var(--text3)' }}>{a.process} · {a.department}</div>

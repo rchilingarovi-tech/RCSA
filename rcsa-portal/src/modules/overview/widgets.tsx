@@ -64,7 +64,7 @@ export function Panel({
         <button
           onClick={onFooter}
           className="px-5 py-2.5 text-left text-[12.5px] font-semibold border-t transition-colors hover:opacity-80"
-          style={{ color: 'var(--accent)', borderColor: 'var(--border)' }}
+          style={{ color: 'var(--link)', borderColor: 'var(--border)' }}
         >
           {footer} →
         </button>
@@ -121,7 +121,7 @@ export function KpiCard({
         </div>
         <div className="text-[12px] mt-1.5 truncate" style={{ color: 'var(--text3)' }}>{sub}</div>
       </div>
-      <div className="text-[12.5px] font-semibold mt-auto" style={{ color: 'var(--accent)' }}>{linkLabel} →</div>
+      <div className="text-[12.5px] font-semibold mt-auto" style={{ color: 'var(--link)' }}>{linkLabel} →</div>
     </button>
   );
 }
@@ -154,7 +154,7 @@ export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOp
                     <span className="font-medium truncate max-w-[220px]" style={{ color: 'var(--text)' }} title={it.label}>{it.label}</span>
                   </div>
                 </td>
-                <td className="px-2 py-2.5"><span className="font-mono text-[11px] font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{it.source}</span></td>
+                <td className="px-2 py-2.5"><span className="font-mono text-[11px] font-semibold whitespace-nowrap" style={{ color: 'var(--link)' }}>{it.source}</span></td>
                 <td className="px-2 py-2.5 text-[12px] whitespace-nowrap" style={{ color: 'var(--text2)' }}>{it.owner}</td>
                 <td className="pl-2 pr-5 py-2.5 text-right whitespace-nowrap">
                   {it.overdueDays && it.overdueDays > 0
@@ -243,7 +243,7 @@ export function WatchList({ rows, empty, onOpen }: { rows: WatchRow[]; empty: st
       {rows.map((r) => (
         <li key={r.id}>
           <button onClick={() => onOpen(r.recordId)} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left risk-row">
-            <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: 'var(--accent)' }}>{r.id}</span>
+            <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: 'var(--link)' }}>{r.id}</span>
             <span className="min-w-0 flex-1 text-[12.5px] font-medium truncate" title={r.label} style={{ color: 'var(--text)' }}>{r.label}</span>
             <Pill text={r.pill} k={r.pillTone} />
             <span className="text-[11px] whitespace-nowrap w-16 text-right" style={{ color: 'var(--text3)' }}>{r.right}</span>
