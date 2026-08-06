@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
+import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
@@ -81,17 +82,17 @@ function FindingModal({ finding, onClose, onSave }: { finding: Finding | 'new'; 
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Finding — ${e.id}` : 'New Finding'} subtitle="Audit / regulator finding" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Privileged access reviews not performed quarterly" /></div>
+        <label className="block"><span className={lbl}>Title *</span><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. Privileged access reviews not performed quarterly" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as FindingSource)} className={field}>{FINDING_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><label className={lbl}>Report reference</label><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. NBG-2026-11 §4.2" /></div>
-          <div><label className={lbl}>Severity</label><select value={severity} onChange={(ev) => setSeverity(ev.target.value as FindingSeverity)} className={field}>{FINDING_SEVERITIES.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as FindingStatus)} className={field}>{FINDING_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><label className={lbl}>Remediation owner *</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></div>
-          <div><label className={lbl}>Due date *</label><input type="date" value={dueDate} onChange={(ev) => setDueDate(ev.target.value)} className={field} /></div>
+          <label className="block"><span className={lbl}>Source</span><select value={source} onChange={(ev) => setSource(ev.target.value as FindingSource)} className={field}>{FINDING_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Report reference</span><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. NBG-2026-11 §4.2" /></label>
+          <label className="block"><span className={lbl}>Severity</span><select value={severity} onChange={(ev) => setSeverity(ev.target.value as FindingSeverity)} className={field}>{FINDING_SEVERITIES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Status</span><select value={status} onChange={(ev) => setStatus(ev.target.value as FindingStatus)} className={field}>{FINDING_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Remediation owner *</span><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></label>
+          <label className="block"><span className={lbl}>Due date *</span><input type="date" value={dueDate} onChange={(ev) => setDueDate(ev.target.value)} className={field} /></label>
         </div>
-        <div><label className={lbl}>Finding description</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What the audit found…" /></div>
-        <div><label className={lbl}>Remediation action plan</label><textarea value={actionPlan} maxLength={2000} onChange={(ev) => setActionPlan(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed…" /></div>
+        <label className="block"><span className={lbl}>Finding description</span><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What the audit found…" /></label>
+        <label className="block"><span className={lbl}>Remediation action plan</span><textarea value={actionPlan} maxLength={2000} onChange={(ev) => setActionPlan(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed…" /></label>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save Finding' : 'Create Finding'}</button>
@@ -252,7 +253,7 @@ export function FindingsPage() {
               ) : pager.pageItems.map((f) => {
                 const late = overdue(f);
                 return (
-                  <tr key={f.id} className="risk-row cursor-pointer" onClick={() => setSelectedId(f.id)}>
+                  <tr key={f.id} className="risk-row cursor-pointer" {...rowActivation(() => setSelectedId(f.id), `Open ${f.id}: ${f.title}`)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{f.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[320px] truncate" title={f.title} style={{ color: 'var(--text)' }}>{f.title}</div>

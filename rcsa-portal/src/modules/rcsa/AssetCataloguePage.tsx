@@ -3,6 +3,7 @@ import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { Pill } from '../../components/common/Pill';
+import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import {
@@ -172,7 +173,7 @@ export function AssetCataloguePage() {
                 const rc = riskCount.get(a.id) || 0;
                 const overdue = !!a.reviewDate && a.reviewDate < today();
                 return (
-                  <tr key={a.id} className="risk-row cursor-pointer" onClick={() => modals.openSummary(a.id)}>
+                  <tr key={a.id} className="risk-row cursor-pointer" {...rowActivation(() => modals.openSummary(a.id), `Open ${a.id}: ${a.name}`)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{a.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold" style={{ color: 'var(--text)' }}>{a.name}</div>

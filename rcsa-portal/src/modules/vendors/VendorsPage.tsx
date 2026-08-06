@@ -63,16 +63,17 @@ function VendorModal({ vendor, onClose, onSave }: { vendor: Vendor | 'new'; onCl
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Vendor — ${e.id}` : 'New Vendor'} subtitle="Third-party vendor" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Vendor name *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. CardFlow Processing" /></div>
+        <label className="block"><span className={lbl}>Vendor name *</span><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. CardFlow Processing" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Criticality</label><select value={criticality} onChange={(ev) => setCriticality(ev.target.value as Criticality)} className={field}>{CRITICALITIES.map((c) => <option key={c}>{c}</option>)}</select></div>
-          <div><label className={lbl}>Data access</label><select value={dataAccess} onChange={(ev) => setDataAccess(ev.target.value as DataAccess)} className={field}>{DATA_ACCESS.map((d) => <option key={d}>{d}</option>)}</select></div>
-          <div><label className={lbl}>Residual score (0–100, lower is better)</label><input value={score} onChange={(ev) => setScore(ev.target.value)} className={field} inputMode="numeric" placeholder="0–100" /></div>
-          <div><label className={lbl}>Contract expiry</label><input type="date" value={contractExpiry} onChange={(ev) => setContractExpiry(ev.target.value)} className={field} /></div>
+          <label className="block"><span className={lbl}>Criticality</span><select value={criticality} onChange={(ev) => setCriticality(ev.target.value as Criticality)} className={field}>{CRITICALITIES.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Data access</span><select value={dataAccess} onChange={(ev) => setDataAccess(ev.target.value as DataAccess)} className={field}>{DATA_ACCESS.map((d) => <option key={d}>{d}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Residual score (0–100, lower is better)</span><input value={score} onChange={(ev) => setScore(ev.target.value)} className={field} inputMode="numeric" placeholder="0–100" /></label>
+          <label className="block"><span className={lbl}>Contract expiry</span><input type="date" value={contractExpiry} onChange={(ev) => setContractExpiry(ev.target.value)} className={field} /></label>
         </div>
         <div>
-          <label className={lbl}>Certifications</label>
-          <div className="flex flex-wrap gap-2">
+          {/* A group of toggles, not one control — labelled as a group. */}
+          <span className={lbl} id="cert-group-label">Certifications</span>
+          <div className="flex flex-wrap gap-2" role="group" aria-labelledby="cert-group-label">
             {CERT_OPTIONS.map((c) => {
               const on = certs.includes(c);
               return (

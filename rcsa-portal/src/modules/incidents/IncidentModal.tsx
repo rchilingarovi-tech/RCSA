@@ -82,35 +82,35 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Incident — ${e.id}` : 'Report New Incident'} subtitle="Security incident record" maxWidth="max-w-2xl">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6">
         <FormSection first title="What happened" hint="The facts you have now — everything needed to log the incident.">
-          <div><label className={lbl}>Short description *</label><input value={shortDesc} maxLength={200} onChange={(ev) => setShortDesc(ev.target.value)} className={field} placeholder="e.g. Phishing campaign targeting finance team" /></div>
+          <label className="block"><span className={lbl}>Short description *</span><input value={shortDesc} maxLength={200} onChange={(ev) => setShortDesc(ev.target.value)} className={field} placeholder="e.g. Phishing campaign targeting finance team" /></label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className={lbl}>Time reported</label><input type="datetime-local" value={reportedAt} onChange={(ev) => setReportedAt(ev.target.value)} className={field} /></div>
-            <div><label className={lbl}>Incident time (when it happened)</label><input type="datetime-local" value={occurredAt} onChange={(ev) => setOccurredAt(ev.target.value)} className={field} /></div>
-            <div><label className={lbl}>Reported by *</label><input value={reportedBy} maxLength={120} onChange={(ev) => setReportedBy(ev.target.value)} className={field} placeholder="Person / source" /></div>
-            <div><label className={lbl}>Responsible person</label><input value={responsible} maxLength={120} onChange={(ev) => setResponsible(ev.target.value)} className={field} placeholder="Handler / owner" /></div>
+            <label className="block"><span className={lbl}>Time reported</span><input type="datetime-local" value={reportedAt} onChange={(ev) => setReportedAt(ev.target.value)} className={field} /></label>
+            <label className="block"><span className={lbl}>Incident time (when it happened)</span><input type="datetime-local" value={occurredAt} onChange={(ev) => setOccurredAt(ev.target.value)} className={field} /></label>
+            <label className="block"><span className={lbl}>Reported by *</span><input value={reportedBy} maxLength={120} onChange={(ev) => setReportedBy(ev.target.value)} className={field} placeholder="Person / source" /></label>
+            <label className="block"><span className={lbl}>Responsible person</span><input value={responsible} maxLength={120} onChange={(ev) => setResponsible(ev.target.value)} className={field} placeholder="Handler / owner" /></label>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className={lbl}>Category</label>
+            <label className="block">
+              <span className={lbl}>Category</span>
               <select value={category} onChange={(ev) => setCategory(ev.target.value as IncidentCategory)} className={field}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
-            </div>
-            <div>
-              <label className={lbl}>Severity</label>
+            </label>
+            <label className="block">
+              <span className={lbl}>Severity</span>
               <select value={severity} onChange={(ev) => setSeverity(ev.target.value as Severity)} className={field}>{SEVERITIES.map((s) => <option key={s}>{s}</option>)}</select>
-            </div>
-            <div>
-              <label className={lbl}>Affected asset / system</label>
+            </label>
+            <label className="block">
+              <span className={lbl}>Affected asset / system</span>
               <input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Email Gateway" />
-            </div>
+            </label>
           </div>
 
           {category === 'Other' && (
-            <div><label className={lbl}>Specify category</label><input value={categoryOther} maxLength={120} onChange={(ev) => setCategoryOther(ev.target.value)} className={field} placeholder="Describe the incident category" /></div>
+            <label className="block"><span className={lbl}>Specify category</span><input value={categoryOther} maxLength={120} onChange={(ev) => setCategoryOther(ev.target.value)} className={field} placeholder="Describe the incident category" /></label>
           )}
 
-          <div><label className={lbl}>Description</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What happened, impact, actions taken…" /></div>
+          <label className="block"><span className={lbl}>Description</span><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What happened, impact, actions taken…" /></label>
         </FormSection>
 
         <FormSection
@@ -121,19 +121,19 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
             : 'Findings and remedial action for this incident.'}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Status</label>
+            <label className="block">
+              <span className={lbl}>Status</span>
               <select value={status} onChange={(ev) => setStatus(ev.target.value as IncidentStatus)} className={field}>{INCIDENT_STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
-            </div>
-            <div>
-              <label className={lbl}>Closure date</label>
+            </label>
+            <label className="block">
+              <span className={lbl}>Closure date</span>
               <input type="date" value={closedAt} onChange={(ev) => setClosedAt(ev.target.value)} className={field} disabled={status !== 'Closed'} title={status !== 'Closed' ? 'Set status to Closed to record a closure date' : ''} />
-            </div>
+            </label>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><label className={lbl}>Root cause</label><textarea value={rootCause} maxLength={2000} onChange={(ev) => setRootCause(ev.target.value)} className={field} rows={3} placeholder="Underlying cause" /></div>
-            <div><label className={lbl}>Corrective action</label><textarea value={correctiveAction} maxLength={2000} onChange={(ev) => setCorrectiveAction(ev.target.value)} className={field} rows={3} placeholder="Remedial action taken" /></div>
+            <label className="block"><span className={lbl}>Root cause</span><textarea value={rootCause} maxLength={2000} onChange={(ev) => setRootCause(ev.target.value)} className={field} rows={3} placeholder="Underlying cause" /></label>
+            <label className="block"><span className={lbl}>Corrective action</span><textarea value={correctiveAction} maxLength={2000} onChange={(ev) => setCorrectiveAction(ev.target.value)} className={field} rows={3} placeholder="Remedial action taken" /></label>
           </div>
         </FormSection>
 

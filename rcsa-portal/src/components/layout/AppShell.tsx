@@ -159,6 +159,15 @@ export function AppShell() {
     <NavContext.Provider value={{ activeId: active.id, navigate: navigateToRecord }}>
     <HeaderSlotContext.Provider value={headerSlot}>
       <div className="h-screen flex overflow-hidden">
+        {/* Skip link — without it every module switch costs 20+ tab stops through the nav */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          Skip to content
+        </a>
+
         {/* Mobile overlay */}
         {navOpen && (
           <div className="fixed inset-0 modal-bg z-30 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden />
@@ -280,7 +289,7 @@ export function AppShell() {
             <UserSwitcher />
           </header>
 
-          <main className="flex-1 min-w-0 overflow-y-auto">
+          <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 overflow-y-auto outline-none">
             {blocked ? (
               <div className="p-6">
                 <div className="section-card max-w-md mx-auto mt-16 p-8 text-center">

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from '../../components/common/Icon';
 import { Pill } from '../../components/common/Pill';
+import { rowActivation } from '../../lib/a11y';
 import type {
   AttentionItem,
   Priority,
@@ -145,7 +146,7 @@ export function AttentionTable({ items, onOpen }: { items: AttentionItem[]; onOp
           {items.map((it) => {
             const tone = priorityTone[it.priority];
             return (
-              <tr key={it.id} onClick={() => onOpen(it.moduleId, it.recordId)} className="risk-row cursor-pointer">
+              <tr key={it.id} className="risk-row cursor-pointer" {...rowActivation(() => onOpen(it.moduleId, it.recordId), `Open ${it.source}: ${it.label}`)}>
                 <td className="pl-5 pr-2 py-2.5 w-px"><Pill text={it.priority} k={tone} /></td>
                 <td className="px-2 py-2.5">
                   <div className="flex items-center gap-2">

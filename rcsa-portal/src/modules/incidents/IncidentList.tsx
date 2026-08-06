@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pill } from '../../components/common/Pill';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { RowActions } from '../../components/common/RowActions';
+import { rowActivation } from '../../lib/a11y';
 import {
   INCIDENT_STATUSES,
   SEVERITY_RANK,
@@ -49,8 +50,22 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
 
   const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
   const caret = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  // A real button inside the header cell: reachable by keyboard, and aria-sort
+  // announces the current direction instead of a caret nobody can hear.
   const sortable = (key: SortKey, label: string, extra = '') => (
-    <th className={`${th} cursor-pointer select-none ${extra}`} onClick={() => toggleSort(key)}>{label}{caret(key)}</th>
+    <th
+      className={`${th} select-none ${extra}`}
+      aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide cursor-pointer"
+        title={`Sort by ${label}`}
+      >
+        {label}{caret(key)}
+      </button>
+    </th>
   );
 
   return (
@@ -78,7 +93,7 @@ export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, on
               <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No incidents match the filters.</td></tr>
             ) : (
               pager.pageItems.map((i) => (
-                <tr key={i.id} className="risk-row cursor-pointer" onClick={() => onView(i)}>
+                <tr key={i.id} className="risk-row cursor-pointer" {...rowActivation(() => onView(i), `Open ${i.id}: ${i.shortDesc}`)}>
                   <td className="px-3 py-3 font-mono text-xs text-gray-600 font-semibold whitespace-nowrap">{i.id}</td>
                   <td className="px-3 py-3 font-medium text-gray-800 max-w-[220px] sm:max-w-[340px] truncate" title={i.shortDesc}>{i.shortDesc}</td>
                   <td className="px-3 py-3 text-sm max-w-[160px] truncate hidden sm:table-cell" title={categoryLabel(i)}>{categoryLabel(i)}</td>

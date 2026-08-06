@@ -45,14 +45,14 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Campaign — ${e.id}` : 'New Access Review'} subtitle="Entitlement review campaign" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Campaign *</label><input value={campaign} maxLength={200} onChange={(ev) => setCampaign(ev.target.value)} className={field} placeholder="e.g. Q2 privileged access review" /></div>
-        <div><label className={lbl}>Scope</label><input value={scope} maxLength={200} onChange={(ev) => setScope(ev.target.value)} className={field} placeholder="What is being reviewed" /></div>
+        <label className="block"><span className={lbl}>Campaign *</span><input value={campaign} maxLength={200} onChange={(ev) => setCampaign(ev.target.value)} className={field} placeholder="e.g. Q2 privileged access review" /></label>
+        <label className="block"><span className={lbl}>Scope</span><input value={scope} maxLength={200} onChange={(ev) => setScope(ev.target.value)} className={field} placeholder="What is being reviewed" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className={lbl}>Period</label><input value={period} maxLength={40} onChange={(ev) => setPeriod(ev.target.value)} className={field} placeholder="2026-Q2" /></div>
-          <div><label className={lbl}>Reviewer</label><input value={reviewer} maxLength={120} onChange={(ev) => setReviewer(ev.target.value)} className={field} placeholder="Reviewer / team" /></div>
-          <div><label className={lbl}>Due date</label><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></div>
+          <label className="block"><span className={lbl}>Period</span><input value={period} maxLength={40} onChange={(ev) => setPeriod(ev.target.value)} className={field} placeholder="2026-Q2" /></label>
+          <label className="block"><span className={lbl}>Reviewer</span><input value={reviewer} maxLength={120} onChange={(ev) => setReviewer(ev.target.value)} className={field} placeholder="Reviewer / team" /></label>
+          <label className="block"><span className={lbl}>Due date</span><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></label>
         </div>
-        <div><label className={lbl}>Progress %</label><input value={progress} onChange={(ev) => setProgress(ev.target.value)} className={field} inputMode="numeric" placeholder="0–100" /></div>
+        <label className="block"><span className={lbl}>Progress %</span><input value={progress} onChange={(ev) => setProgress(ev.target.value)} className={field} inputMode="numeric" placeholder="0–100" /></label>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save Campaign' : 'Create Campaign'}</button>

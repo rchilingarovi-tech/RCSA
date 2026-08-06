@@ -47,15 +47,15 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Course — ${e.id}` : 'New Course / Campaign'} subtitle="Awareness training item" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Course / campaign *</label><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Annual security awareness 2026" /></div>
+        <label className="block"><span className={lbl}>Course / campaign *</span><input value={name} maxLength={200} onChange={(ev) => setName(ev.target.value)} className={field} placeholder="e.g. Annual security awareness 2026" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className={lbl}>Type</label><select value={type} onChange={(ev) => setType(ev.target.value as CourseType)} className={field}>{COURSE_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
-          <div><label className={lbl}>Method</label><select value={method} onChange={(ev) => setMethod(ev.target.value as Method)} className={field}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select></div>
-          <div><label className={lbl}>Due date</label><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></div>
+          <label className="block"><span className={lbl}>Type</span><select value={type} onChange={(ev) => setType(ev.target.value as CourseType)} className={field}>{COURSE_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Method</span><select value={method} onChange={(ev) => setMethod(ev.target.value as Method)} className={field}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Due date</span><input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} className={field} /></label>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Audience</label><input value={audience} maxLength={120} onChange={(ev) => setAudience(ev.target.value)} className={field} placeholder="e.g. All staff (5,500)" /></div>
-          <div><label className={lbl}>Completion %</label><input value={completion} onChange={(ev) => setCompletion(ev.target.value)} className={field} inputMode="numeric" /></div>
+          <label className="block"><span className={lbl}>Audience</span><input value={audience} maxLength={120} onChange={(ev) => setAudience(ev.target.value)} className={field} placeholder="e.g. All staff (5,500)" /></label>
+          <label className="block"><span className={lbl}>Completion %</span><input value={completion} onChange={(ev) => setCompletion(ev.target.value)} className={field} inputMode="numeric" /></label>
         </div>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>

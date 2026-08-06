@@ -48,15 +48,15 @@ function PlanModal({ item, onClose, onSave }: { item: Initiative | 'new'; onClos
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Initiative — ${e.id}` : 'New Initiative'} subtitle="Annual roadmap item" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Initiative *</label><input value={initiative} maxLength={200} onChange={(ev) => setInitiative(ev.target.value)} className={field} placeholder="e.g. SIEM detection engineering uplift" /></div>
+        <label className="block"><span className={lbl}>Initiative *</span><input value={initiative} maxLength={200} onChange={(ev) => setInitiative(ev.target.value)} className={field} placeholder="e.g. SIEM detection engineering uplift" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Category</label><select value={category} onChange={(ev) => setCategory(ev.target.value as PlanCategory)} className={field}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
-          <div><label className={lbl}>Owner</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Owner / team" /></div>
+          <label className="block"><span className={lbl}>Category</span><select value={category} onChange={(ev) => setCategory(ev.target.value as PlanCategory)} className={field}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Owner</span><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Owner / team" /></label>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className={lbl}>Quarter</label><select value={quarter} onChange={(ev) => setQuarter(ev.target.value as Quarter)} className={field}>{QUARTERS.map((qr) => <option key={qr}>{qr}</option>)}</select></div>
-          <div><label className={lbl}>Priority</label><select value={priority} onChange={(ev) => setPriority(ev.target.value as Priority)} className={field}>{PRIORITIES.map((p) => <option key={p}>{p}</option>)}</select></div>
-          <div><label className={lbl}>Progress %</label><input value={progress} onChange={(ev) => setProgress(ev.target.value)} className={field} inputMode="numeric" /></div>
+          <label className="block"><span className={lbl}>Quarter</span><select value={quarter} onChange={(ev) => setQuarter(ev.target.value as Quarter)} className={field}>{QUARTERS.map((qr) => <option key={qr}>{qr}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Priority</span><select value={priority} onChange={(ev) => setPriority(ev.target.value as Priority)} className={field}>{PRIORITIES.map((p) => <option key={p}>{p}</option>)}</select></label>
+          <label className="block"><span className={lbl}>Progress %</span><input value={progress} onChange={(ev) => setProgress(ev.target.value)} className={field} inputMode="numeric" /></label>
         </div>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>

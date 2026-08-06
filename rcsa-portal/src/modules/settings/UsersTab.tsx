@@ -76,19 +76,19 @@ function UserModal({ user, onClose }: { user: AppUser | 'new'; onClose: () => vo
     <Modal open onClose={onClose} title={e ? `Edit User — ${e.displayName}` : 'New User'} subtitle="Local account (demo)" maxWidth="max-w-lg">
       <form onSubmit={submit} className="p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Display name *</label><input value={displayName} onChange={(ev) => setDisplayName(ev.target.value)} className={field} placeholder="e.g. Data Otarashvili" /></div>
-          <div><label className={lbl}>Username *</label><input value={username} onChange={(ev) => setUsername(ev.target.value)} className={field} placeholder="e.g. dotarashvili" /></div>
-          <div><label className={lbl}>Title</label><input value={title} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="Job title" /></div>
-          <div><label className={lbl}>Email</label><input value={email} onChange={(ev) => setEmail(ev.target.value)} className={field} placeholder="name@lb.ge" /></div>
+          <label className="block"><span className={lbl}>Display name *</span><input value={displayName} onChange={(ev) => setDisplayName(ev.target.value)} className={field} placeholder="e.g. Data Otarashvili" /></label>
+          <label className="block"><span className={lbl}>Username *</span><input value={username} onChange={(ev) => setUsername(ev.target.value)} className={field} placeholder="e.g. dotarashvili" /></label>
+          <label className="block"><span className={lbl}>Title</span><input value={title} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="Job title" /></label>
+          <label className="block"><span className={lbl}>Email</span><input value={email} onChange={(ev) => setEmail(ev.target.value)} className={field} placeholder="name@lb.ge" /></label>
         </div>
-        <div><label className={lbl}>Directory groups</label><input value={groups} onChange={(ev) => setGroups(ev.target.value)} className={field} placeholder="GRC-Editors, Risk-Contributors" /></div>
+        <label className="block"><span className={lbl}>Directory groups</span><input value={groups} onChange={(ev) => setGroups(ev.target.value)} className={field} placeholder="GRC-Editors, Risk-Contributors" /></label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={lbl}>Baseline role</label>
+          <label className="block">
+            <span className={lbl}>Baseline role</span>
             <select value={role} onChange={(ev) => setRole(ev.target.value as Role | 'none')} className={field}>
               {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
-          </div>
+          </label>
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm pb-2" style={{ color: 'var(--text2)' }}>
               <input type="checkbox" className="w-4 h-4 accent-[var(--accent)]" checked={isAdmin} onChange={(ev) => setIsAdmin(ev.target.checked)} />
@@ -97,8 +97,8 @@ function UserModal({ user, onClose }: { user: AppUser | 'new'; onClose: () => vo
           </div>
         </div>
 
-        <div>
-          <label className={lbl}>{e ? 'New password (leave blank to keep current)' : 'Password *'}</label>
+        <label className="block">
+          <span className={lbl}>{e ? 'New password (leave blank to keep current)' : 'Password *'}</span>
           <input type="password" value={password} onChange={(ev) => setPassword(ev.target.value)} className={field} placeholder="••••••••••••" />
           {showPwChecklist && (
             <ul className="mt-2 space-y-0.5">
@@ -112,7 +112,7 @@ function UserModal({ user, onClose }: { user: AppUser | 'new'; onClose: () => vo
               })}
             </ul>
           )}
-        </div>
+        </label>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>

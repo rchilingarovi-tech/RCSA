@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { FormSection } from '../../components/common/FormSection';
 import { Pill } from '../../components/common/Pill';
+import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useUi } from '../../components/common/UiProvider';
@@ -96,20 +97,21 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Vulnerability — ${e.id}` : 'New Vulnerability'} subtitle="Scan / pentest finding" maxWidth="max-w-lg">
       <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6">
         <FormSection first title="The vulnerability" hint="What was found, where, and how severe — this sets the remediation clock.">
-          <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. SQL injection in loan-application search" /></div>
+          <label className="block"><span className={lbl}>Title *</span><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. SQL injection in loan-application search" /></label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as VulnSource)} className={field}>{VULN_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
-            <div><label className={lbl}>Reference / CVE</label><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. PT-2026-02 F-04" /></div>
-            <div><label className={lbl}>Severity</label><select value={severity} onChange={(ev) => setSeverity(ev.target.value as VulnSeverity)} className={field}>{VULN_SEVERITIES.map((s) => <option key={s}>{s} — SLA {SLA_DAYS[s]}d</option>)}</select></div>
-            <div><label className={lbl}>CVSS (optional)</label><input value={cvss} maxLength={4} onChange={(ev) => setCvss(ev.target.value)} className={field} inputMode="decimal" placeholder="0–10" /></div>
-            <div><label className={lbl}>Discovered *</label><input type="date" value={discovered} onChange={(ev) => setDiscovered(ev.target.value)} className={field} /></div>
+            <label className="block"><span className={lbl}>Source</span><select value={source} onChange={(ev) => setSource(ev.target.value as VulnSource)} className={field}>{VULN_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
+            <label className="block"><span className={lbl}>Reference / CVE</span><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. PT-2026-02 F-04" /></label>
+            <label className="block"><span className={lbl}>Severity</span><select value={severity} onChange={(ev) => setSeverity(ev.target.value as VulnSeverity)} className={field}>{VULN_SEVERITIES.map((s) => <option key={s}>{s} — SLA {SLA_DAYS[s]}d</option>)}</select></label>
+            <label className="block"><span className={lbl}>CVSS (optional)</span><input value={cvss} maxLength={4} onChange={(ev) => setCvss(ev.target.value)} className={field} inputMode="decimal" placeholder="0–10" /></label>
+            <label className="block"><span className={lbl}>Discovered *</span><input type="date" value={discovered} onChange={(ev) => setDiscovered(ev.target.value)} className={field} /></label>
             <div>
-              <label className={lbl}>SLA deadline (derived)</label>
-              <div className={`${field} bg-gray-50`} style={{ color: 'var(--text2)' }}>{deadline || '—'}</div>
+              {/* Derived, not editable — a <label> pointing at a non-control is meaningless. */}
+              <span className={lbl}>SLA deadline (derived)</span>
+              <output className={`${field} bg-gray-50 block`} style={{ color: 'var(--text2)' }}>{deadline || '—'}</output>
             </div>
           </div>
-          <div><label className={lbl}>Affected asset / system</label><input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Mobile Banking API" /></div>
-          <div><label className={lbl}>Technical detail</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What was found and how it can be abused…" /></div>
+          <label className="block"><span className={lbl}>Affected asset / system</span><input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Mobile Banking API" /></label>
+          <label className="block"><span className={lbl}>Technical detail</span><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What was found and how it can be abused…" /></label>
         </FormSection>
 
         <FormSection
@@ -120,10 +122,10 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
             : 'Who owns the fix and how it will be done.'}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className={lbl}>Remediation owner *</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></div>
-            <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as VulnStatus)} className={field}>{VULN_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
+            <label className="block"><span className={lbl}>Remediation owner *</span><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></label>
+            <label className="block"><span className={lbl}>Status</span><select value={status} onChange={(ev) => setStatus(ev.target.value as VulnStatus)} className={field}>{VULN_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></label>
           </div>
-          <div><label className={lbl}>Remediation plan</label><textarea value={remediation} maxLength={2000} onChange={(ev) => setRemediation(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed / compensating controls…" /></div>
+          <label className="block"><span className={lbl}>Remediation plan</span><textarea value={remediation} maxLength={2000} onChange={(ev) => setRemediation(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed / compensating controls…" /></label>
         </FormSection>
 
         <div className="flex justify-end gap-3 pt-5 mt-5 border-t">
@@ -276,7 +278,7 @@ export function VulnsPage() {
                 const left = slaDaysLeft(v);
                 const openItem = isOpenVuln(v);
                 return (
-                  <tr key={v.id} className="risk-row cursor-pointer" onClick={() => setSelectedId(v.id)}>
+                  <tr key={v.id} className="risk-row cursor-pointer" {...rowActivation(() => setSelectedId(v.id), `Open ${v.id}: ${v.title}`)}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--accent)' }}>{v.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold max-w-[300px] truncate" title={v.title} style={{ color: 'var(--text)' }}>{v.title}</div>
