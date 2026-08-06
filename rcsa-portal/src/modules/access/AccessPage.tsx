@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -121,23 +122,16 @@ export function AccessPage() {
   const del = (r: AccessReview) => ui.confirm(`Delete "${r.campaign}"?`, 'You can undo this immediately afterwards.', () => { setReviews(accessRepo.remove(r.id)); ui.toast('Campaign deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setReviews(accessRepo.save(r)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample campaigns and discards your changes.', () => { setReviews(accessRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const avg = reviews.length ? Math.round(reviews.reduce((s, r) => s + (Number(r.progress) || 0), 0) / reviews.length) : 0;
-  const stats: { l: string; v: string | number; t?: Tone }[] = [
+  const stats: Stat<AccessReview>[] = [
     { l: 'Campaigns', v: reviews.length },
     { l: 'Avg completion', v: `${avg}%`, t: 'ok' },
-    { l: 'Overdue', v: reviews.filter(overdue).length, t: 'crit' },
-    { l: 'Completed', v: reviews.filter((r) => r.progress >= 100).length, t: 'low' },
+    { l: 'Overdue', v: reviews.filter(overdue).length, t: 'crit', k: 'stat:overdue', pred: overdue },
+    { l: 'Completed', v: reviews.filter((r) => r.progress >= 100).length, t: 'low', k: 'stat:done', pred: (r) => r.progress >= 100 },
   ];
 
   return (
     <div className="p-6 space-y-4">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       <ChartGrid sortKey="access-charts">
         <ChartPanel title="Campaign state" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>

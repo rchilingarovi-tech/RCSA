@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -173,23 +174,16 @@ export function KpisPage() {
   const save = (k: Kpi) => { setKpis(kpiRepo.save(k)); setEditing(null); ui.toast('KPI saved', 'bg-green-700'); };
   const del = (k: Kpi) => ui.confirm(`Delete "${k.name}"?`, 'You can undo this immediately afterwards.', () => { setKpis(kpiRepo.remove(k.id)); ui.toast('KPI deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setKpis(kpiRepo.save(k)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample KPIs and discards your changes.', () => { setKpis(kpiRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Kpi>[] = [
     { l: 'KPIs tracked', v: kpis.length },
-    { l: 'On track', v: kpis.filter((k) => rag(k) === 'low').length, t: 'low' },
-    { l: 'At risk', v: kpis.filter((k) => rag(k) === 'med').length, t: 'med' },
-    { l: 'Off track', v: kpis.filter((k) => rag(k) === 'crit').length, t: 'crit' },
+    { l: 'On track', v: kpis.filter((k) => rag(k) === 'low').length, t: 'low', k: 'stat:ontrack', pred: (k) => rag(k) === 'low' },
+    { l: 'At risk', v: kpis.filter((k) => rag(k) === 'med').length, t: 'med', k: 'stat:atrisk', pred: (k) => rag(k) === 'med' },
+    { l: 'Off track', v: kpis.filter((k) => rag(k) === 'crit').length, t: 'crit', k: 'stat:offtrack', pred: (k) => rag(k) === 'crit' },
   ];
 
   return (
     <div className="p-6 space-y-4">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       <ChartGrid sortKey="kpis-charts">
         <ChartPanel title="RAG overview" span={4} filterLabel={chipFor('rag:')} onClearFilter={filter.clear}>

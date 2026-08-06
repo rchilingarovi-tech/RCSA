@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -159,24 +160,17 @@ export function VendorsPage() {
   const save = (v: Vendor) => { setVendors(vendorRepo.save(v)); setEditing(null); ui.toast('Vendor saved', 'bg-green-700'); };
   const del = (v: Vendor) => ui.confirm(`Delete "${v.name}"?`, 'You can undo this immediately afterwards.', () => { setVendors(vendorRepo.remove(v.id)); ui.toast('Vendor deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setVendors(vendorRepo.save(v)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vendors and discards your changes.', () => { setVendors(vendorRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Vendor>[] = [
     { l: 'Vendors', v: vendors.length },
-    { l: 'Critical', v: vendors.filter((v) => v.criticality === 'Critical').length, t: 'crit' },
-    { l: 'High risk score (≥60)', v: vendors.filter((v) => v.score >= 60).length, t: 'high' },
-    { l: 'Renewals ≤60 days', v: vendors.filter((v) => v.contractExpiry < in60).length, t: 'med' },
+    { l: 'Critical', v: vendors.filter((v) => v.criticality === 'Critical').length, t: 'crit', k: 'stat:critical', pred: (v) => v.criticality === 'Critical' },
+    { l: 'High risk score (≥60)', v: vendors.filter((v) => v.score >= 60).length, t: 'high', k: 'stat:score60', pred: (v) => v.score >= 60 },
+    { l: 'Renewals ≤60 days', v: vendors.filter((v) => v.contractExpiry < in60).length, t: 'med', k: 'stat:renew60', pred: (v) => v.contractExpiry < in60 },
   ];
 
   return (
     <div className="p-6 space-y-4">
       {/* Stat strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       {/* Charts */}
       <ChartGrid sortKey="vendors-charts">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { FormSection } from '../../components/common/FormSection';
 import { Pill } from '../../components/common/Pill';
 import { rowActivation } from '../../lib/a11y';
@@ -203,24 +204,17 @@ export function VulnsPage() {
   const save = (v: Vuln) => { setVulns(vulnRepo.save(v)); setEditing(null); ui.toast('Vulnerability saved', 'bg-green-700'); };
   const del = (v: Vuln) => ui.confirm(`Delete "${v.id}"?`, 'You can undo this immediately afterwards.', () => { setVulns(vulnRepo.remove(v.id)); ui.toast('Vulnerability deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setVulns(vulnRepo.save(v)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample vulnerabilities and discards your changes.', () => { setVulns(vulnRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Vuln>[] = [
     { l: 'Vulnerabilities', v: vulns.length },
-    { l: 'Open', v: open.length, t: 'high' },
-    { l: 'SLA breached', v: vulns.filter(slaBreached).length, t: 'crit' },
-    { l: 'Critical / High open', v: open.filter((v) => v.severity === 'Critical' || v.severity === 'High').length, t: 'crit' },
+    { l: 'Open', v: open.length, t: 'high', k: 'stat:open', pred: isOpenVuln },
+    { l: 'SLA breached', v: vulns.filter(slaBreached).length, t: 'crit', k: 'stat:sla', pred: slaBreached },
+    { l: 'Critical / High open', v: open.filter((v) => v.severity === 'Critical' || v.severity === 'High').length, t: 'crit', k: 'stat:sevopen', pred: (v) => isOpenVuln(v) && (v.severity === 'Critical' || v.severity === 'High') },
   ];
 
   return (
     <div className="p-6 space-y-4">
       {/* Stat strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       {/* Interactive charts */}
       <ChartGrid sortKey="vulns-charts">

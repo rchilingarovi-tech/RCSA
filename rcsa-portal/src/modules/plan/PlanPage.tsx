@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -124,23 +125,16 @@ export function PlanPage() {
   const del = (i: Initiative) => ui.confirm(`Delete "${i.initiative}"?`, 'You can undo this immediately afterwards.', () => { setItems(planRepo.remove(i.id)); ui.toast('Initiative deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setItems(planRepo.save(i)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample initiatives and discards your changes.', () => { setItems(planRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const avgAll = items.length ? Math.round(items.reduce((s, i) => s + (Number(i.progress) || 0), 0) / items.length) : 0;
-  const stats: { l: string; v: string | number; t?: Tone }[] = [
+  const stats: Stat<Initiative>[] = [
     { l: 'Initiatives', v: items.length },
-    { l: 'High priority', v: items.filter((i) => i.priority === 'High').length, t: 'crit' },
+    { l: 'High priority', v: items.filter((i) => i.priority === 'High').length, t: 'crit', k: 'stat:high', pred: (i) => i.priority === 'High' },
     { l: 'Avg progress', v: `${avgAll}%`, t: 'ok' },
-    { l: 'Completed', v: items.filter((i) => i.progress >= 100).length, t: 'low' },
+    { l: 'Completed', v: items.filter((i) => i.progress >= 100).length, t: 'low', k: 'stat:done', pred: (i) => i.progress >= 100 },
   ];
 
   return (
     <div className="p-6 space-y-4">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       <ChartGrid sortKey="plan-charts">
         <ChartPanel title="Priority mix" span={4} filterLabel={chipFor('pri:')} onClearFilter={filter.clear}>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -119,23 +120,16 @@ export function CommitteePage() {
   const save = (m: Meeting) => { setMeetings(committeeRepo.save(m)); setEditing(null); ui.toast('Meeting saved', 'bg-green-700'); };
   const del = (m: Meeting) => ui.confirm(`Delete "${m.title}"?`, 'You can undo this immediately afterwards.', () => { setMeetings(committeeRepo.remove(m.id)); ui.toast('Meeting deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setMeetings(committeeRepo.save(m)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample meetings and discards your changes.', () => { setMeetings(committeeRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Meeting>[] = [
     { l: 'Meetings logged', v: meetings.length },
-    { l: 'Upcoming', v: meetings.filter((m) => m.status === 'Scheduled').length, t: 'info' },
+    { l: 'Upcoming', v: meetings.filter((m) => m.status === 'Scheduled').length, t: 'info', k: 'stat:upcoming', pred: (m) => m.status === 'Scheduled' },
     { l: 'Open actions', v: totalOpen, t: 'high' },
-    { l: 'Minutes issued', v: meetings.filter((m) => m.status === 'Minutes Issued').length, t: 'low' },
+    { l: 'Minutes issued', v: meetings.filter((m) => m.status === 'Minutes Issued').length, t: 'low', k: 'stat:minutes', pred: (m) => m.status === 'Minutes Issued' },
   ];
 
   return (
     <div className="p-6 space-y-4">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       <ChartGrid sortKey="committee-charts">
         <ChartPanel title="Meeting status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>

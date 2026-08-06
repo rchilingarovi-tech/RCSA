@@ -3,6 +3,7 @@ import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { Pill } from '../../components/common/Pill';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -109,24 +110,17 @@ export function AssetCataloguePage() {
     return m;
   }, [store.risks]);
 
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Asset>[] = [
     { l: 'Assets', v: assets.length },
-    { l: 'High criticality', v: assets.filter((a) => critLabel(a) === 'High').length, t: 'crit' },
-    { l: 'Internet-facing', v: assets.filter((a) => a.internet === 'Yes').length, t: 'high' },
-    { l: 'Reviews overdue', v: assets.filter((a) => a.reviewDate && a.reviewDate < today()).length, t: 'med' },
+    { l: 'High criticality', v: assets.filter((a) => critLabel(a) === 'High').length, t: 'crit', k: 'stat:high', pred: (a) => critLabel(a) === 'High' },
+    { l: 'Internet-facing', v: assets.filter((a) => a.internet === 'Yes').length, t: 'high', k: 'stat:internet', pred: (a) => a.internet === 'Yes' },
+    { l: 'Reviews overdue', v: assets.filter((a) => a.reviewDate && a.reviewDate < today()).length, t: 'med', k: 'stat:revoverdue', pred: (a) => Boolean(a.reviewDate && a.reviewDate < today()) },
   ];
 
   return (
     <div className="p-6 space-y-4">
       {/* Stat strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       {/* Interactive charts */}
       <ChartGrid sortKey="assets-charts">

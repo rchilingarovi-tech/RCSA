@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
@@ -168,24 +169,17 @@ export function FindingsPage() {
   const del = (f: Finding) => ui.confirm(`Delete "${f.id}"?`, 'You can undo this immediately afterwards.', () => { setFindings(findingsRepo.remove(f.id)); ui.toast('Finding deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setFindings(findingsRepo.save(f)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample findings and discards your changes.', () => { setFindings(findingsRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
   const open = findings.filter(isOpenFinding);
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<Finding>[] = [
     { l: 'Findings', v: findings.length },
-    { l: 'Open', v: open.length, t: 'high' },
-    { l: 'Overdue', v: findings.filter(overdue).length, t: 'crit' },
-    { l: 'Critical / High open', v: open.filter((f) => f.severity === 'Critical' || f.severity === 'High').length, t: 'crit' },
+    { l: 'Open', v: open.length, t: 'high', k: 'stat:open', pred: isOpenFinding },
+    { l: 'Overdue', v: findings.filter(overdue).length, t: 'crit', k: 'stat:overdue', pred: overdue },
+    { l: 'Critical / High open', v: open.filter((f) => f.severity === 'Critical' || f.severity === 'High').length, t: 'crit', k: 'stat:sevopen', pred: (f) => isOpenFinding(f) && (f.severity === 'Critical' || f.severity === 'High') },
   ];
 
   return (
     <div className="p-6 space-y-4">
       {/* Stat strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       {/* Interactive charts */}
       <ChartGrid sortKey="findings-charts">

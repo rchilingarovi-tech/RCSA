@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { StatStrip, type Stat } from '../../components/common/StatStrip';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -131,23 +132,16 @@ export function PoliciesPage() {
   const save = (d: PolicyDoc) => { setDocs(policyRepo.save(d)); setEditing(null); ui.toast('Document saved', 'bg-green-700'); };
   const del = (d: PolicyDoc) => ui.confirm(`Delete "${d.title}"?`, 'You can undo this immediately afterwards.', () => { setDocs(policyRepo.remove(d.id)); ui.toast('Document deleted', { color: 'bg-red-700', action: { label: 'Undo', onClick: () => setDocs(policyRepo.save(d)) } }); });
   const resetDemo = () => ui.confirm('Reset demo data?', 'Restores the sample documents and discards your changes.', () => { setDocs(policyRepo.reset()); ui.toast('Demo data restored', 'bg-green-700'); }, { confirmLabel: 'Reset data' });
-  const stats: { l: string; v: number; t?: Tone }[] = [
+  const stats: Stat<PolicyDoc>[] = [
     { l: 'Documents', v: docs.length },
-    { l: 'Approved', v: docs.filter((d) => d.status === 'Approved').length, t: 'low' },
-    { l: 'Reviews due ≤30d', v: docs.filter(CADENCE[1].pred).length, t: 'med' },
-    { l: 'Reviews overdue', v: docs.filter(CADENCE[0].pred).length, t: 'crit' },
+    { l: 'Approved', v: docs.filter((d) => d.status === 'Approved').length, t: 'low', k: 'stat:approved', pred: (d) => d.status === 'Approved' },
+    { l: 'Reviews due ≤30d', v: docs.filter(CADENCE[1].pred).length, t: 'med', k: 'stat:due30', pred: CADENCE[1].pred },
+    { l: 'Reviews overdue', v: docs.filter(CADENCE[0].pred).length, t: 'crit', k: 'stat:revoverdue', pred: CADENCE[0].pred },
   ];
 
   return (
     <div className="p-6 space-y-4">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))' }}>
-        {stats.map((s) => (
-          <div key={s.l} className="section-card p-4">
-            <div className="tabular-nums text-2xl font-bold" style={{ color: s.t ? `var(--${s.t})` : 'var(--text)' }}>{s.v}</div>
-            <div className="text-[12px] mt-1" style={{ color: 'var(--text3)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      <StatStrip stats={stats} filter={filter} />
 
       <ChartGrid sortKey="policies-charts">
         <ChartPanel title="Document status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
