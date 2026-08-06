@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
+import { FormSection } from '../../components/common/FormSection';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
@@ -58,6 +59,9 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
   // Any field change arms the discard guard (change events bubble to the form).
   const [dirty, setDirty] = useState(false);
 
+  // The fix plan follows triage; only the owner is expected up front.
+  const remediationPending = status === 'Open' && !remediation;
+
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a vulnerability title.', 'bg-orange-600'); return; }
@@ -90,25 +94,39 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
 
   return (
     <Modal open onClose={onClose} dirty={dirty} title={e ? `Edit Vulnerability — ${e.id}` : 'New Vulnerability'} subtitle="Scan / pentest finding" maxWidth="max-w-lg">
-      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6 space-y-4">
-        <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. SQL injection in loan-application search" /></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as VulnSource)} className={field}>{VULN_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><label className={lbl}>Reference / CVE</label><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. PT-2026-02 F-04" /></div>
-          <div><label className={lbl}>Severity</label><select value={severity} onChange={(ev) => setSeverity(ev.target.value as VulnSeverity)} className={field}>{VULN_SEVERITIES.map((s) => <option key={s}>{s} — SLA {SLA_DAYS[s]}d</option>)}</select></div>
-          <div><label className={lbl}>CVSS (optional)</label><input value={cvss} maxLength={4} onChange={(ev) => setCvss(ev.target.value)} className={field} inputMode="decimal" placeholder="0–10" /></div>
-          <div><label className={lbl}>Discovered *</label><input type="date" value={discovered} onChange={(ev) => setDiscovered(ev.target.value)} className={field} /></div>
-          <div>
-            <label className={lbl}>SLA deadline (derived)</label>
-            <div className={`${field} bg-gray-50`} style={{ color: 'var(--text2)' }}>{deadline || '—'}</div>
+      <form onSubmit={submit} onChange={() => setDirty(true)} className="p-6">
+        <FormSection first title="The vulnerability" hint="What was found, where, and how severe — this sets the remediation clock.">
+          <div><label className={lbl}>Title *</label><input value={title} maxLength={200} onChange={(ev) => setTitle(ev.target.value)} className={field} placeholder="e.g. SQL injection in loan-application search" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className={lbl}>Source</label><select value={source} onChange={(ev) => setSource(ev.target.value as VulnSource)} className={field}>{VULN_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
+            <div><label className={lbl}>Reference / CVE</label><input value={ref} maxLength={60} onChange={(ev) => setRef(ev.target.value)} className={field} placeholder="e.g. PT-2026-02 F-04" /></div>
+            <div><label className={lbl}>Severity</label><select value={severity} onChange={(ev) => setSeverity(ev.target.value as VulnSeverity)} className={field}>{VULN_SEVERITIES.map((s) => <option key={s}>{s} — SLA {SLA_DAYS[s]}d</option>)}</select></div>
+            <div><label className={lbl}>CVSS (optional)</label><input value={cvss} maxLength={4} onChange={(ev) => setCvss(ev.target.value)} className={field} inputMode="decimal" placeholder="0–10" /></div>
+            <div><label className={lbl}>Discovered *</label><input type="date" value={discovered} onChange={(ev) => setDiscovered(ev.target.value)} className={field} /></div>
+            <div>
+              <label className={lbl}>SLA deadline (derived)</label>
+              <div className={`${field} bg-gray-50`} style={{ color: 'var(--text2)' }}>{deadline || '—'}</div>
+            </div>
           </div>
-          <div><label className={lbl}>Remediation owner *</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></div>
-          <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as VulnStatus)} className={field}>{VULN_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
-        </div>
-        <div><label className={lbl}>Affected asset / system</label><input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Mobile Banking API" /></div>
-        <div><label className={lbl}>Technical detail</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What was found and how it can be abused…" /></div>
-        <div><label className={lbl}>Remediation plan</label><textarea value={remediation} maxLength={2000} onChange={(ev) => setRemediation(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed / compensating controls…" /></div>
-        <div className="flex justify-end gap-3 pt-4 border-t">
+          <div><label className={lbl}>Affected asset / system</label><input value={asset} maxLength={120} onChange={(ev) => setAsset(ev.target.value)} className={field} placeholder="e.g. Mobile Banking API" /></div>
+          <div><label className={lbl}>Technical detail</label><textarea value={description} maxLength={2000} onChange={(ev) => setDescription(ev.target.value)} className={field} rows={3} placeholder="What was found and how it can be abused…" /></div>
+        </FormSection>
+
+        <FormSection
+          title="Remediation"
+          muted={remediationPending}
+          hint={remediationPending
+            ? 'Assign an owner now; the plan can follow once triage is done.'
+            : 'Who owns the fix and how it will be done.'}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className={lbl}>Remediation owner *</label><input value={owner} maxLength={120} onChange={(ev) => setOwner(ev.target.value)} className={field} placeholder="Team / person" /></div>
+            <div><label className={lbl}>Status</label><select value={status} onChange={(ev) => setStatus(ev.target.value as VulnStatus)} className={field}>{VULN_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
+          </div>
+          <div><label className={lbl}>Remediation plan</label><textarea value={remediation} maxLength={2000} onChange={(ev) => setRemediation(ev.target.value)} className={field} rows={3} placeholder="How it will be fixed / compensating controls…" /></div>
+        </FormSection>
+
+        <div className="flex justify-end gap-3 pt-5 mt-5 border-t">
           <button type="button" onClick={onClose} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">{e ? 'Save Vulnerability' : 'Create Vulnerability'}</button>
         </div>
