@@ -131,7 +131,7 @@ export function CommitteePage() {
     <div className="p-6 space-y-4">
       <StatStrip stats={stats} filter={filter} />
 
-      <ChartGrid sortKey="committee-charts">
+      <ChartGrid sortKey="committee-charts" collapsible>
         <ChartPanel title="Meeting status" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={statusSeg} center={String(totalOpen)} sub="open actions" activeKey={filter.activeKey} onSelect={selectStatus} />
         </ChartPanel>

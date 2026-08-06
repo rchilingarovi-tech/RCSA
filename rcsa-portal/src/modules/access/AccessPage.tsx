@@ -133,7 +133,7 @@ export function AccessPage() {
     <div className="p-6 space-y-4">
       <StatStrip stats={stats} filter={filter} />
 
-      <ChartGrid sortKey="access-charts">
+      <ChartGrid sortKey="access-charts" collapsible>
         <ChartPanel title="Campaign state" span={4} filterLabel={chipFor('st:')} onClearFilter={filter.clear}>
           <DonutChart segments={stateSeg} center={String(reviews.length)} sub="campaigns" activeKey={filter.activeKey} onSelect={selectState} />
         </ChartPanel>

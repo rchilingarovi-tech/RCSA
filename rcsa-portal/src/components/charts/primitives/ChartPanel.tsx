@@ -17,9 +17,55 @@ const slugOf = (v: unknown, i: number): string =>
  * grab handle (visible on hover); the order persists per page in localStorage,
  * keyed by the child's `title` prop so hidden/shown panels keep their place.
  */
-export function ChartGrid({ children, sortKey }: { children: ReactNode; sortKey?: string }) {
-  if (!sortKey) return <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">{children}</div>;
-  return <SortableGrid sortKey={sortKey}>{children}</SortableGrid>;
+export function ChartGrid({
+  children,
+  sortKey,
+  collapsible = false,
+}: {
+  children: ReactNode;
+  sortKey?: string;
+  /** Register pages: the table is the work and the charts are context, so the
+   *  band can be folded away. Off by default — pages where the charts ARE the
+   *  content (overview, calendar) must never be collapsible. */
+  collapsible?: boolean;
+}) {
+  const grid = sortKey
+    ? <SortableGrid sortKey={sortKey}>{children}</SortableGrid>
+    : <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">{children}</div>;
+
+  if (!collapsible || !sortKey) return grid;
+  return <CollapsibleBand storeKey={`infosec.charts.${sortKey}.collapsed`}>{grid}</CollapsibleBand>;
+}
+
+/** Starts expanded: nothing disappears unless the user chose to fold it. */
+function CollapsibleBand({ storeKey, children }: { storeKey: string; children: ReactNode }) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(storeKey) === '1'; } catch { return false; }
+  });
+  const toggle = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try { localStorage.setItem(storeKey, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          className="no-print text-[11.5px] font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:opacity-80"
+          style={{ color: 'var(--text3)' }}
+        >
+          {collapsed ? 'Show charts' : 'Hide charts'}
+          <span aria-hidden="true" className="text-[9px] leading-none">{collapsed ? '▼' : '▲'}</span>
+        </button>
+      </div>
+      {!collapsed && children}
+    </div>
+  );
 }
 
 function SortableGrid({ sortKey, children }: { sortKey: string; children: ReactNode }) {

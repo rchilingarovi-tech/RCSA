@@ -185,7 +185,7 @@ export function KpisPage() {
     <div className="p-6 space-y-4">
       <StatStrip stats={stats} filter={filter} />
 
-      <ChartGrid sortKey="kpis-charts">
+      <ChartGrid sortKey="kpis-charts" collapsible>
         <ChartPanel title="RAG overview" span={4} filterLabel={chipFor('rag:')} onClearFilter={filter.clear}>
           <RagOverview segments={ragSeg} total={kpis.length} activeKey={filter.activeKey} onSelect={selectRag} />
         </ChartPanel>

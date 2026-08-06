@@ -217,7 +217,7 @@ export function VulnsPage() {
       <StatStrip stats={stats} filter={filter} />
 
       {/* Interactive charts */}
-      <ChartGrid sortKey="vulns-charts">
+      <ChartGrid sortKey="vulns-charts" collapsible>
         <ChartPanel title="Open by severity" span={4} filterLabel={chipFor('sev:')} onClearFilter={filter.clear}>
           <DonutChart segments={sevSeg} center={String(open.length)} sub="open" activeKey={filter.activeKey} onSelect={selectSev} />
         </ChartPanel>
