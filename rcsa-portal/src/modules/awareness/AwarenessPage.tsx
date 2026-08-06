@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -100,7 +101,20 @@ export function AwarenessPage() {
     if (!s) return courses;
     return courses.filter((c) => [c.id, c.course, c.type, c.audience, c.method].join(' ').toLowerCase().includes(s));
   }, [courses, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: soonest due first.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      course: (c) => c.course,
+      type: (c) => COURSE_TYPES.indexOf(c.type),
+      method: (c) => METHODS.indexOf(c.method),
+      due: (c) => c.due,
+      completion: (c) => c.completion,
+    },
+    { key: 'due', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (c: Course) => { setCourses(awarenessRepo.save(c)); setEditing(null); ui.toast('Course saved', 'bg-green-700'); };
@@ -177,11 +191,11 @@ export function AwarenessPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Course</th>
-                <th className="text-left px-4 py-3">Type</th>
-                <th className="text-left px-4 py-3">Method</th>
-                <th className="text-left px-4 py-3">Due</th>
-                <th className="text-left px-4 py-3" style={{ minWidth: 160 }}>Completion</th>
+                {sortable('course', 'Course')}
+                {sortable('type', 'Type')}
+                {sortable('method', 'Method')}
+                {sortable('due', 'Due')}
+                {sortable('completion', 'Completion', '', { minWidth: 160 })}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

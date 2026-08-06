@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -154,7 +155,19 @@ export function KpisPage() {
     if (!s) return kpis;
     return kpis.filter((k) => [k.id, k.name, k.direction, k.unit].join(' ').toLowerCase().includes(s));
   }, [kpis, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: worst attainment first — sorts RAG by the real measure behind it.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      name: (k) => k.name,
+      target: (k) => k.target,
+      current: (k) => k.current,
+      attainment: (k) => attainment(k),
+    },
+    { key: 'attainment', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (k: Kpi) => { setKpis(kpiRepo.save(k)); setEditing(null); ui.toast('KPI saved', 'bg-green-700'); };
@@ -219,10 +232,10 @@ export function KpisPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">KPI</th>
-                <th className="text-left px-4 py-3">Target</th>
-                <th className="text-left px-4 py-3">Current</th>
-                <th className="text-left px-4 py-3">RAG</th>
+                {sortable('name', 'KPI')}
+                {sortable('target', 'Target')}
+                {sortable('current', 'Current')}
+                {sortable('attainment', 'RAG')}
                 <th className="text-left px-4 py-3">Trend</th>
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>

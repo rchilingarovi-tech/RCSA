@@ -5,6 +5,7 @@ import { Pill } from '../../components/common/Pill';
 import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -180,7 +181,22 @@ export function VulnsPage() {
     if (!s) return vulns;
     return vulns.filter((v) => [v.id, v.title, v.ref, v.asset, v.owner, v.source, v.severity, v.status].join(' ').toLowerCase().includes(s));
   }, [vulns, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: nearest SLA deadline first — breaches lead.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      id: (v) => v.id,
+      title: (v) => v.title,
+      source: (v) => v.source,
+      severity: (v) => VULN_SEVERITIES.indexOf(v.severity),
+      sla: (v) => slaDeadline(v),
+      owner: (v) => v.owner,
+      status: (v) => VULN_STATUSES.indexOf(v.status),
+    },
+    { key: 'sla', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
   const selected = selectedId ? vulns.find((v) => v.id === selectedId) ?? null : null;
 
@@ -261,13 +277,13 @@ export function VulnsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">ID</th>
-                <th className="text-left px-4 py-3">Vulnerability</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Source</th>
-                <th className="text-left px-4 py-3">Severity</th>
-                <th className="text-left px-4 py-3">SLA deadline</th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell">Owner</th>
-                <th className="text-left px-4 py-3">Status</th>
+                {sortable('id', 'ID')}
+                {sortable('title', 'Vulnerability')}
+                {sortable('source', 'Source', 'hidden md:table-cell')}
+                {sortable('severity', 'Severity')}
+                {sortable('sla', 'SLA deadline')}
+                {sortable('owner', 'Owner', 'hidden sm:table-cell')}
+                {sortable('status', 'Status')}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

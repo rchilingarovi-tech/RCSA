@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
 import { Pill } from '../../components/common/Pill';
+import { useTableSort } from '../../components/common/useTableSort';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { RowActions } from '../../components/common/RowActions';
 import { rowActivation } from '../../lib/a11y';
@@ -14,8 +14,7 @@ import {
   type Incident,
 } from './types';
 
-type SortKey = 'id' | 'reportedAt' | 'severity' | 'status';
-const th = 'text-left px-3 py-3 text-[10.5px] font-semibold tracking-wide uppercase whitespace-nowrap';
+const th ='text-left px-3 py-3 text-[10.5px] font-semibold tracking-wide uppercase whitespace-nowrap';
 
 const fmtDateTime = (s: string) => {
   const d = new Date(s);
@@ -32,41 +31,19 @@ interface Props {
 }
 
 export function IncidentList({ incidents, canEdit, canRemove, onView, onEdit, onDelete }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'reportedAt', dir: 'desc' });
-
-  const rows = useMemo(() => {
-    const dir = sort.dir === 'asc' ? 1 : -1;
-    return [...incidents].sort((a, b) => {
-      let c = 0;
-      if (sort.key === 'severity') c = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
-      else if (sort.key === 'status') c = INCIDENT_STATUSES.indexOf(a.status) - INCIDENT_STATUSES.indexOf(b.status);
-      else if (sort.key === 'reportedAt') c = a.reportedAt < b.reportedAt ? -1 : a.reportedAt > b.reportedAt ? 1 : 0;
-      else c = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-      return c * dir;
-    });
-  }, [incidents, sort]);
+  const { rows, sortable } = useTableSort<Incident>(
+    incidents,
+    {
+      id: (r) => r.id,
+      reportedAt: (r) => r.reportedAt,
+      severity: (r) => SEVERITY_RANK[r.severity],
+      status: (r) => INCIDENT_STATUSES.indexOf(r.status),
+    },
+    { key: 'reportedAt', dir: 'desc' },
+    th,
+  );
 
   const pager = usePaged(rows);
-
-  const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
-  const caret = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  // A real button inside the header cell: reachable by keyboard, and aria-sort
-  // announces the current direction instead of a caret nobody can hear.
-  const sortable = (key: SortKey, label: string, extra = '') => (
-    <th
-      className={`${th} select-none ${extra}`}
-      aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-    >
-      <button
-        type="button"
-        onClick={() => toggleSort(key)}
-        className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide cursor-pointer"
-        title={`Sort by ${label}`}
-      >
-        {label}{caret(key)}
-      </button>
-    </th>
-  );
 
   return (
     <div className="section-card">

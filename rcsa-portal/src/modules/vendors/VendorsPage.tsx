@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -139,7 +140,20 @@ export function VendorsPage() {
     if (!s) return vendors;
     return vendors.filter((v) => [v.id, v.name, v.criticality, v.dataAccess, v.certs.join(' ')].join(' ').toLowerCase().includes(s));
   }, [vendors, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: most critical vendors first.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      name: (v) => v.name,
+      criticality: (v) => CRITICALITIES.indexOf(v.criticality),
+      score: (v) => v.score,
+      contractExpiry: (v) => v.contractExpiry,
+      certs: (v) => v.certs.length,
+    },
+    { key: 'criticality', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (v: Vendor) => { setVendors(vendorRepo.save(v)); setEditing(null); ui.toast('Vendor saved', 'bg-green-700'); };
@@ -229,11 +243,11 @@ export function VendorsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Vendor</th>
-                <th className="text-left px-4 py-3">Criticality</th>
-                <th className="text-left px-4 py-3">Risk score</th>
-                <th className="text-left px-4 py-3">Contract</th>
-                <th className="text-left px-4 py-3">Certifications</th>
+                {sortable('name', 'Vendor')}
+                {sortable('criticality', 'Criticality')}
+                {sortable('score', 'Risk score')}
+                {sortable('contractExpiry', 'Contract')}
+                {sortable('certs', 'Certifications')}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

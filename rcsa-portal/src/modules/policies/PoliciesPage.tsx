@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -112,7 +113,19 @@ export function PoliciesPage() {
     if (!s) return docs;
     return docs.filter((d) => [d.id, d.title, d.type, d.status, d.owner, d.version].join(' ').toLowerCase().includes(s));
   }, [docs, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: earliest review date first (undated documents last).
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      title: (d) => d.title,
+      type: (d) => DOC_TYPES.indexOf(d.type),
+      status: (d) => DOC_STATUSES.indexOf(d.status),
+      nextReview: (d) => d.nextReview,
+    },
+    { key: 'nextReview', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (d: PolicyDoc) => { setDocs(policyRepo.save(d)); setEditing(null); ui.toast('Document saved', 'bg-green-700'); };
@@ -206,10 +219,10 @@ export function PoliciesPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Document</th>
-                <th className="text-left px-4 py-3">Type</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Review</th>
+                {sortable('title', 'Document')}
+                {sortable('type', 'Type')}
+                {sortable('status', 'Status')}
+                {sortable('nextReview', 'Review')}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

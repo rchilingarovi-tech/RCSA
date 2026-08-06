@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -100,7 +101,19 @@ export function CommitteePage() {
     if (!s) return meetings;
     return meetings.filter((m) => [m.id, m.title, m.attendance, m.decisions, m.status].join(' ').toLowerCase().includes(s));
   }, [meetings, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: most recent meeting first.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      title: (m) => m.title,
+      date: (m) => m.date,
+      status: (m) => MEETING_STATUSES.indexOf(m.status),
+      openActions: (m) => m.openActions,
+    },
+    { key: 'date', dir: 'desc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (m: Meeting) => { setMeetings(committeeRepo.save(m)); setEditing(null); ui.toast('Meeting saved', 'bg-green-700'); };
@@ -147,10 +160,10 @@ export function CommitteePage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Meeting</th>
-                <th className="text-left px-4 py-3">Date</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Open actions</th>
+                {sortable('title', 'Meeting')}
+                {sortable('date', 'Date')}
+                {sortable('status', 'Status')}
+                {sortable('openActions', 'Open actions')}
                 <th className="text-left px-4 py-3">Decisions</th>
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>

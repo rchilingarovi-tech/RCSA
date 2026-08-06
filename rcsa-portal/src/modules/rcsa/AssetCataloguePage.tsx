@@ -6,6 +6,7 @@ import { Pill } from '../../components/common/Pill';
 import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import {
   ChartGrid,
   ChartPanel,
@@ -84,7 +85,22 @@ export function AssetCataloguePage() {
     if (!s) return assets;
     return assets.filter((a) => [a.id, a.name, a.process, a.department, a.busOwner, a.itOwner, a.dataClass].join(' ').toLowerCase().includes(s));
   }, [assets, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: most critical assets first.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      id: (a) => a.id,
+      name: (a) => a.name,
+      busOwner: (a) => a.busOwner,
+      criticality: (a) => CRIT_ORDER.indexOf(critLabel(a) as (typeof CRIT_ORDER)[number]),
+      dataClass: (a) => a.dataClass,
+      status: (a) => a.status,
+      reviewDate: (a) => a.reviewDate,
+    },
+    { key: 'criticality', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const riskCount = useMemo(() => {
@@ -153,14 +169,14 @@ export function AssetCataloguePage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Asset #</th>
-                <th className="text-left px-4 py-3">Name / Process</th>
-                <th className="text-left px-4 py-3">Owners</th>
+                {sortable('id', 'Asset #')}
+                {sortable('name', 'Name / Process')}
+                {sortable('busOwner', 'Owners')}
                 <th className="text-center px-4 py-3">C·I·A</th>
-                <th className="text-left px-4 py-3">Criticality</th>
-                <th className="text-left px-4 py-3">Classification</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Review</th>
+                {sortable('criticality', 'Criticality')}
+                {sortable('dataClass', 'Classification')}
+                {sortable('status', 'Status')}
+                {sortable('reviewDate', 'Review')}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

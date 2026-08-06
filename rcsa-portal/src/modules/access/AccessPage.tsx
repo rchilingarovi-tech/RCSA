@@ -3,6 +3,7 @@ import { Modal } from '../../components/common/Modal';
 import { Pill } from '../../components/common/Pill';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -100,7 +101,20 @@ export function AccessPage() {
     if (!s) return reviews;
     return reviews.filter((r) => [r.id, r.campaign, r.scope, r.period, r.reviewer].join(' ').toLowerCase().includes(s));
   }, [reviews, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: soonest review deadline first.
+  const { rows, sortable } = useTableSort(
+    filter.apply(searched),
+    {
+      campaign: (r) => r.campaign,
+      period: (r) => r.period,
+      reviewer: (r) => r.reviewer,
+      due: (r) => r.due,
+      progress: (r) => r.progress,
+    },
+    { key: 'due', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
 
   const save = (r: AccessReview) => { setReviews(accessRepo.save(r)); setEditing(null); ui.toast('Campaign saved', 'bg-green-700'); };
@@ -178,11 +192,11 @@ export function AccessPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">Campaign</th>
-                <th className="text-left px-4 py-3">Period</th>
-                <th className="text-left px-4 py-3">Reviewer</th>
-                <th className="text-left px-4 py-3">Due</th>
-                <th className="text-left px-4 py-3" style={{ minWidth: 160 }}>Progress</th>
+                {sortable('campaign', 'Campaign')}
+                {sortable('period', 'Period')}
+                {sortable('reviewer', 'Reviewer')}
+                {sortable('due', 'Due')}
+                {sortable('progress', 'Progress', '', { minWidth: 160 })}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>

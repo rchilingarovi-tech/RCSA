@@ -4,6 +4,7 @@ import { Pill } from '../../components/common/Pill';
 import { rowActivation } from '../../lib/a11y';
 import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
+import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
@@ -144,7 +145,22 @@ export function FindingsPage() {
     if (!s) return findings;
     return findings.filter((f) => [f.id, f.title, f.ref, f.owner, f.source, f.severity, f.status].join(' ').toLowerCase().includes(s));
   }, [findings, q]);
-  const rows = filter.apply(searched);
+  // Sort runs after search + chart filter, so it composes with them.
+  // Default: soonest deadline first — an overdue finding leads the register.
+  const { rows, sortable } = useTableSort<Finding>(
+    filter.apply(searched),
+    {
+      id: (f) => f.id,
+      title: (f) => f.title,
+      source: (f) => f.source,
+      severity: (f) => FINDING_SEVERITIES.indexOf(f.severity),
+      owner: (f) => f.owner,
+      dueDate: (f) => f.dueDate,
+      status: (f) => FINDING_STATUSES.indexOf(f.status),
+    },
+    { key: 'dueDate', dir: 'asc' },
+    'text-left px-4 py-3',
+  );
   const pager = usePaged(rows);
   const selected = selectedId ? findings.find((f) => f.id === selectedId) ?? null : null;
 
@@ -237,13 +253,13 @@ export function FindingsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
               <tr>
-                <th className="text-left px-4 py-3">ID</th>
-                <th className="text-left px-4 py-3">Finding</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Source</th>
-                <th className="text-left px-4 py-3">Severity</th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell">Owner</th>
-                <th className="text-left px-4 py-3">Due</th>
-                <th className="text-left px-4 py-3">Status</th>
+                {sortable('id', 'ID')}
+                {sortable('title', 'Finding')}
+                {sortable('source', 'Source', 'hidden md:table-cell')}
+                {sortable('severity', 'Severity')}
+                {sortable('owner', 'Owner', 'hidden sm:table-cell')}
+                {sortable('dueDate', 'Due')}
+                {sortable('status', 'Status')}
                 <th className="text-left px-4 py-3">Actions</th>
               </tr>
             </thead>
