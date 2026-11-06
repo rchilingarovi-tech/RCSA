@@ -6,6 +6,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { courseIo } from './io';
@@ -40,7 +41,9 @@ function CourseModal({ course, onClose, onSave }: { course: Course | 'new'; onCl
     ev.preventDefault();
     if (!name.trim()) { ui.toast('Enter a course / campaign name.', 'bg-orange-600'); return; }
     const c = Math.max(0, Math.min(100, Number(completion) || 0));
-    onSave({ id: e ? e.id : awarenessRepo.nextId(), course: name.trim(), type, audience: audience.trim(), method, due, completion: c });
+    const id = e ? e.id : allocateOrReport(() => awarenessRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
+    onSave({ id, course: name.trim(), type, audience: audience.trim(), method, due, completion: c });
   }
 
   const field = 'w-full border rounded px-3 py-2 text-sm';

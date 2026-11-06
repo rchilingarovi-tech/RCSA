@@ -5,6 +5,7 @@ import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { useUi } from '../common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { genId, today } from '../../domain/scoring';
 import { TREATMENT_STATUSES } from '../../domain/constants';
 import type { Treatment, TreatmentStatus } from '../../data/models';
@@ -62,8 +63,10 @@ export function TreatmentModal({ editId, riskId }: { editId: string | null; risk
     if (!title.trim()) { ui.toast('Give the treatment a title.', 'bg-orange-600'); return; }
     if (riskIds.length === 0) { ui.toast('Select at least one risk this treatment addresses.', 'bg-orange-600'); return; }
 
+    const id = editId || allocateOrReport(() => genId('TRT', store.treatments), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     const obj: Treatment = {
-      id: editId || genId('TRT', store.treatments),
+      id,
       riskIds,
       title: title.trim(),
       description: description.trim(),

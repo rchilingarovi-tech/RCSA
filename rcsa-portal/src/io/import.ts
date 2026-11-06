@@ -18,6 +18,7 @@ import {
   THREAT_CATALOGUE,
 } from '../domain/constants';
 import { today } from '../domain/scoring';
+import { createIdAllocator, idAllocationMessage } from '../data/ids';
 
 // ── Spreadsheet import (.csv) ───────────────────────────────────────────────────
 // Parses a CSV file into validated Asset[] / Risk[]. No third-party parser (the
@@ -151,23 +152,30 @@ function parseList(value: string): string[] {
     .filter(Boolean);
 }
 
-/** Allocate the next free `PREFIX-000` id, honouring ids already taken this batch. */
-function makeIdAllocator(prefix: string, used: Set<string>) {
-  let max = 0;
-  const re = new RegExp(`^${prefix}-(\\d+)$`, 'i');
-  for (const id of used) {
-    const m = id.match(re);
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  return (): string => {
-    max += 1;
-    let id = `${prefix}-${String(max).padStart(3, '0')}`;
-    while (used.has(id)) {
-      max += 1;
-      id = `${prefix}-${String(max).padStart(3, '0')}`;
-    }
-    used.add(id);
-    return id;
+/**
+ * Batch id allocation through the shared safe allocator (data/ids.ts), built
+ * ONCE per import and updated incrementally, honouring ids already taken
+ * (existing + this batch). Only rows that passed validation reserve or
+ * allocate ids. If allocation fails (numbering limit), the row gets an error
+ * and is skipped.
+ */
+function makeIdAllocator(prefix: string, used: Set<string>, field: string) {
+  const allocator = createIdAllocator(prefix, used, 3);
+  return {
+    next(bad: (field: string, message: string) => void): string {
+      try {
+        const id = allocator.next();
+        used.add(id);
+        return id;
+      } catch (err) {
+        bad(field, idAllocationMessage(err));
+        return '';
+      }
+    },
+    reserve(id: string): void {
+      used.add(id);
+      allocator.reserve(id);
+    },
   };
 }
 
@@ -184,7 +192,7 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
 
   const byId = new Map(existing.map((a) => [a.id.toUpperCase(), a]));
   const usedIds = new Set(existing.map((a) => a.id));
-  const nextId = makeIdAllocator('AST', usedIds);
+  const ids = makeIdAllocator('AST', usedIds, 'Asset ID');
 
   raws.forEach((raw, i) => {
     if (isRowEmpty(raw)) return;
@@ -223,6 +231,12 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
     const status = enumOr<AssetStatus>('Status', get('Status'), ASSET_STATUSES, 'Draft');
 
     // Resolve id: explicit id updates the matching asset; otherwise allocate.
+    // Rows that already failed validation reserve / allocate no id.
+    if (rowErrors.length) {
+      errors.push(...rowErrors);
+      skipped += 1;
+      return;
+    }
     const givenId = get('Asset ID', 'ID');
     let id: string;
     let isUpdate = false;
@@ -232,13 +246,13 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
         id = match.id;
         isUpdate = true;
       } else if (usedIds.has(givenId)) {
-        id = nextId(); // collides with a row already taken this batch
+        id = ids.next(bad); // collides with a row already taken this batch
       } else {
         id = givenId;
-        usedIds.add(givenId);
+        ids.reserve(givenId);
       }
     } else {
-      id = nextId();
+      id = ids.next(bad);
     }
 
     if (rowErrors.length) {
@@ -296,7 +310,7 @@ export async function parseRisksFile(
   const riskById = new Map(existingRisks.map((r) => [r.id.toUpperCase(), r]));
   const assetIds = new Set(assets.map((a) => a.id.toUpperCase()));
   const usedIds = new Set(existingRisks.map((r) => r.id));
-  const nextId = makeIdAllocator('RSK', usedIds);
+  const ids = makeIdAllocator('RSK', usedIds, 'Risk ID');
 
   raws.forEach((raw, i) => {
     if (isRowEmpty(raw)) return;
@@ -343,6 +357,12 @@ export async function parseRisksFile(
       (matchEnum<Assessment>(get('Decision', 'Assessment'), ASSESSMENTS) as Assessment | null) ??
       (get('Decision', 'Assessment') ? (bad('Decision', `must be: ${ASSESSMENTS.join(', ')}`), 'Mitigate') : 'Mitigate');
 
+    // Rows that already failed validation reserve / allocate no id.
+    if (rowErrors.length) {
+      errors.push(...rowErrors);
+      skipped += 1;
+      return;
+    }
     const givenId = get('Risk ID', 'ID');
     let id: string;
     let isUpdate = false;
@@ -352,13 +372,13 @@ export async function parseRisksFile(
         id = match.id;
         isUpdate = true;
       } else if (usedIds.has(givenId)) {
-        id = nextId();
+        id = ids.next(bad);
       } else {
         id = givenId;
-        usedIds.add(givenId);
+        ids.reserve(givenId);
       }
     } else {
-      id = nextId();
+      id = ids.next(bad);
     }
 
     if (rowErrors.length) {
@@ -411,7 +431,7 @@ export async function parseTreatmentsFile(
   const byId = new Map(existingTreatments.map((t) => [t.id.toUpperCase(), t]));
   const riskIdSet = new Set(risks.map((r) => r.id.toUpperCase()));
   const usedIds = new Set(existingTreatments.map((t) => t.id));
-  const nextId = makeIdAllocator('TRT', usedIds);
+  const ids = makeIdAllocator('TRT', usedIds, 'Treatment ID');
 
   raws.forEach((raw, i) => {
     if (isRowEmpty(raw)) return;
@@ -442,6 +462,12 @@ export async function parseTreatmentsFile(
       (matchEnum<TreatmentStatus>(get('Status'), TREATMENT_STATUSES) as TreatmentStatus | null) ??
       (get('Status') ? (bad('Status', `must be: ${TREATMENT_STATUSES.join(', ')}`), 'Open') : 'Open');
 
+    // Rows that already failed validation reserve / allocate no id.
+    if (rowErrors.length) {
+      errors.push(...rowErrors);
+      skipped += 1;
+      return;
+    }
     const givenId = get('Treatment ID', 'ID');
     let id: string;
     let isUpdate = false;
@@ -451,13 +477,13 @@ export async function parseTreatmentsFile(
         id = match.id;
         isUpdate = true;
       } else if (usedIds.has(givenId)) {
-        id = nextId();
+        id = ids.next(bad);
       } else {
         id = givenId;
-        usedIds.add(givenId);
+        ids.reserve(givenId);
       }
     } else {
-      id = nextId();
+      id = ids.next(bad);
     }
 
     if (rowErrors.length) {

@@ -6,6 +6,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { policyIo } from './io';
@@ -43,7 +44,9 @@ function PolicyModal({ doc, onClose, onSave }: { doc: PolicyDoc | 'new'; onClose
   function submit(ev: FormEvent) {
     ev.preventDefault();
     if (!title.trim()) { ui.toast('Enter a document title.', 'bg-orange-600'); return; }
-    onSave({ id: e ? e.id : policyRepo.nextId(), title: title.trim(), type, version: version.trim(), status, owner: owner.trim(), nextReview });
+    const id = e ? e.id : allocateOrReport(() => policyRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
+    onSave({ id, title: title.trim(), type, version: version.trim(), status, owner: owner.trim(), nextReview });
   }
 
   const field = 'w-full border rounded px-3 py-2 text-sm';

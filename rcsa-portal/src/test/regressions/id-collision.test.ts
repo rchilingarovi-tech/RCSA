@@ -1,145 +1,98 @@
-// REGRESSION — confirmed data-loss defect #1: ID collision after a delete.
+// REGRESSION — data-loss defect D1: ID collision after a delete (FIXED by
+// ID-integrity stage S1, docs/ID_INTEGRITY_DESIGN.md).
 //
-// The Asset / Risk / Treatment create modals allocate ids with
-//   genId(prefix, store.<collection>)        (domain/scoring.ts)
-// which is based on the collection LENGTH. Saving is an upsert by id
-// (LocalStorageRepo.save*), so after deleting any record other than the last,
-// the next "new" record reuses the id of an existing one and silently
-// REPLACES it.
+// The Asset / Risk / Treatment create modals used to allocate ids from the
+// collection LENGTH (genId), and saving is an upsert by id, so after deleting
+// any record other than the last the next "new" record took the id of a live
+// record and silently REPLACED it — and every relationship pointing at that id
+// moved to the new record (R1/R2). genId now uses the shared safe allocator
+// (src/data/ids.ts). These scenarios drive the same calls the modals make
+// (genId on the current list, then repo.save*) against the real
+// LocalStorageRepo + seed data.
 //
-// Each scenario drives the same calls the modals make (genId on the current
-// list, then repo.save*) against the real LocalStorageRepo + seed data, and is
-// declared as a known-defect spec (see src/test/helpers.ts):
-//   invariants  scenario really ran; deleted record gone; the new record is
-//               persisted exactly once, exactly as created (true before AND
-//               after a fix — checked first, never bypassable)
-//   correct     fresh id, every survivor unchanged, collection grew by one
-//               (does not assume HOW ids are allocated)
-//   documented  the exact damage today: { reusedId, lostRecords, growth }
-// A separate block proves a correct allocator passes every check.
+// Still OPEN (pinned below as known defects, closed only by stage S5):
+//   R15 — an out-of-date copy that still references a DELETED parent attaches
+//   to the new record that is reissued the same id.
 import { describe, expect, it } from 'vitest';
 import { LocalStorageRepo } from '../../data/localStorageRepo';
 import { createLocalRepo } from '../../data/createLocalRepo';
 import { genId } from '../../domain/scoring';
 import type { Asset, Risk, Treatment } from '../../data/models';
-import { knownDefect, type DefectSpec } from '../helpers';
+import { knownDefect } from '../helpers';
 
-/** Id allocator signature — the app's is `genId`; tests can supply a corrected one. */
-type Alloc = (prefix: string, list: { id: string }[]) => string;
-
-/** A CORRECT allocator (highest existing number + 1) — used only to prove the
- *  known-defect invariants are satisfiable by a real fix (no masking). */
-const maxPlusOne: Alloc = (prefix, list) => {
-  const max = list.reduce((m, x) => Math.max(m, Number(x.id.replace(/\D/g, '')) || 0), 0);
-  return `${prefix}-${String(max + 1).padStart(3, '0')}`;
-};
-
-/** Create a record the way the "New …" modal does, after deleting one from the middle. */
 interface Scenario<T extends { id: string }> {
   before: T[]; // collection before the delete
   deleted: T; // the record removed
   created: T; // the record the user just created
   after: T[]; // collection after the create
 }
+type Pick = 'first' | 'middle' | 'last';
+const pickIndex = (n: number, which: Pick) => (which === 'first' ? 0 : which === 'last' ? n - 1 : Math.floor(n / 2));
 
-async function assetScenario(alloc: Alloc = genId): Promise<Scenario<Asset>> {
+async function assetScenario(which: Pick = 'middle'): Promise<Scenario<Asset>> {
   const repo = new LocalStorageRepo();
   const before = await repo.listAssets();
-  const deleted = before[Math.floor(before.length / 2)];
+  const deleted = before[pickIndex(before.length, which)];
   await repo.deleteAsset(deleted.id);
-  const list = await repo.listAssets();
-  const created: Asset = { ...before[0], id: alloc('AST', list), name: 'Brand-new asset (test)' };
+  const created: Asset = { ...before[1], id: genId('AST', await repo.listAssets()), name: 'Brand-new asset (test)' };
   await repo.saveAsset(created);
   return { before, deleted, created, after: await repo.listAssets() };
 }
 
-async function riskScenario(alloc: Alloc = genId): Promise<Scenario<Risk>> {
+async function riskScenario(which: Pick = 'middle'): Promise<Scenario<Risk>> {
   const repo = new LocalStorageRepo();
   const before = await repo.listRisks();
-  const deleted = before[Math.floor(before.length / 2)];
+  const deleted = before[pickIndex(before.length, which)];
   await repo.deleteRisk(deleted.id);
-  const list = await repo.listRisks();
-  const created: Risk = { ...before[0], id: alloc('RSK', list), threat: 'Brand-new risk (test)' };
+  const created: Risk = { ...before[1], id: genId('RSK', await repo.listRisks()), threat: 'Brand-new risk (test)' };
   await repo.saveRisk(created);
   return { before, deleted, created, after: await repo.listRisks() };
 }
 
-async function treatmentScenario(alloc: Alloc = genId): Promise<Scenario<Treatment>> {
+async function treatmentScenario(which: Pick = 'middle'): Promise<Scenario<Treatment>> {
   const repo = new LocalStorageRepo();
-  // Read order no longer matters on a fresh store: the treatment-initialisation
-  // fix seeds treatments together with risks (see treatment-initialization.test.tsx).
   const before = await repo.listTreatments();
-  const deleted = before[Math.floor(before.length / 2)];
+  const deleted = before[pickIndex(before.length, which)];
   await repo.deleteTreatment(deleted.id);
-  const list = await repo.listTreatments();
-  const created: Treatment = { ...before[0], id: alloc('TRT', list), title: 'Brand-new treatment (test)' };
+  const created: Treatment = { ...before[1], id: genId('TRT', await repo.listTreatments()), title: 'Brand-new treatment (test)' };
   await repo.saveTreatment(created);
   return { before, deleted, created, after: await repo.listTreatments() };
 }
 
 const survivorsOf = <T extends { id: string }>(s: Scenario<T>) => s.before.filter((x) => x.id !== s.deleted.id);
 
-/**
- * Scenario invariants — true BOTH with today's bug AND after a correct fix, so
- * they are checked first and can never be bypassed by a later failure:
- *   • the scenario really deleted a record that existed, and it is gone;
- *   • the new record is persisted, exactly once, exactly as created.
- */
+/** Scenario facts: the delete really happened; the new record is persisted exactly once, unchanged. */
 function expectScenarioInvariants<T extends { id: string }>(s: Scenario<T>): void {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   expect(s.before.length, 'fixture has records to delete from').toBeGreaterThan(2);
   expect(s.before.some((x) => x.id === s.deleted.id), 'deleted record existed').toBe(true);
-  expect(s.after.some((x) => x.id === s.deleted.id), 'deleted record is gone').toBe(false);
+  expect(s.after.some((x) => same(x, s.deleted)), 'deleted record content is gone').toBe(false);
   expect(s.after.filter((x) => x.id === s.created.id), 'new record persisted exactly once, unchanged').toEqual([s.created]);
 }
 
-/** What a correct create-after-delete must satisfy (fails today). */
+/**
+ * S1 guarantee: the new id belongs to NO LIVE record, every survivor is
+ * unchanged, and the collection grew by exactly one. (S1 may reissue the id of
+ * the deleted HIGHEST record — R5, closed only by S5; its harmful consequence
+ * R15 is pinned below as a known defect.)
+ */
 function expectNoOverwrite<T extends { id: string }>(s: Scenario<T>): void {
   const survivors = survivorsOf(s);
-  // The new record's id must be fresh (not any id that existed before the delete).
-  expect(s.before.map((x) => x.id)).not.toContain(s.created.id);
-  // Every surviving record is still there, unchanged.
+  expect(survivors.map((x) => x.id)).not.toContain(s.created.id);
   for (const x of survivors) expect(s.after.find((y) => y.id === x.id)).toEqual(x);
-  // And the collection grew by exactly the new record.
   expect(s.after).toHaveLength(survivors.length + 1);
 }
 
-/** The observed damage, in a form that can be compared exactly. */
-function collisionSymptom<T extends { id: string }>(s: Scenario<T>) {
-  const survivors = survivorsOf(s);
-  return {
-    reusedId: s.before.some((x) => x.id === s.created.id) ? s.created.id : null,
-    lostRecords: survivors
-      .filter((x) => JSON.stringify(s.after.find((y) => y.id === x.id)) !== JSON.stringify(x))
-      .map((x) => x.id),
-    growth: s.after.length - survivors.length,
-  };
-}
-
-function collisionDefect<T extends { id: string }>(
-  scenario: () => Promise<Scenario<T>>,
-  lastSeedId: string,
-): DefectSpec<Scenario<T>> {
-  return {
-    observe: scenario,
-    invariants: expectScenarioInvariants,
-    correct: expectNoOverwrite,
-    symptom: collisionSymptom,
-    // Exactly today's damage: the new record took the LAST seed record's id,
-    // that record was overwritten (lost), and the collection did not grow.
-    documented: { reusedId: lastSeedId, lostRecords: [lastSeedId], growth: 0 },
-  };
-}
-
-// ── Fixture facts (ordinary tests; true before and after any fix) ────────────
+// ── Fixture facts ───────────────────────────────────────────────────────────
 describe('ID collision — fixture', () => {
-  it('fresh seed: 100 assets, and risk/treatment sets large enough to delete from the middle', async () => {
+  it('fresh seed: 100 assets, and risk/treatment sets large enough to delete from', async () => {
     const repo = new LocalStorageRepo();
     expect(await repo.listAssets()).toHaveLength(100);
     expect((await repo.listTreatments()).length).toBeGreaterThan(2);
     expect((await repo.listRisks()).length).toBeGreaterThan(2);
   });
 
-  it('the last seed ids are AST-100, RSK-204 and TRT-195 (referenced by the documented symptoms)', async () => {
+  it('the last seed ids are AST-100, RSK-204 and TRT-195', async () => {
     const repo = new LocalStorageRepo();
     const last = <T extends { id: string }>(xs: T[]) => xs[xs.length - 1].id;
     expect(last(await repo.listAssets())).toBe('AST-100');
@@ -148,38 +101,97 @@ describe('ID collision — fixture', () => {
   });
 });
 
-// ── Known defects ────────────────────────────────────────────────────────────
-describe('ID collision after deleting a record', () => {
-  knownDefect('creating a new asset after a delete does not reuse an existing asset id', collisionDefect(() => assetScenario(), 'AST-100'));
-  knownDefect('creating a new risk after a delete does not reuse an existing risk id', collisionDefect(() => riskScenario(), 'RSK-204'));
-  knownDefect('creating a new treatment after a delete does not reuse an existing treatment id', collisionDefect(() => treatmentScenario(), 'TRT-195'));
-});
-
-describe('ID collision — a correct fix satisfies every known-defect check', () => {
-  // The SAME scenarios, invariants and correct-behaviour assertions as the
-  // known-defect specs, with only the allocator swapped for a correct one. They
-  // pass, so a real allocator fix flips the known-defect tests to "no longer
-  // reproduces" — nothing in the specs depends on the buggy allocation.
-  it.each([
-    ['asset', () => assetScenario(maxPlusOne)],
-    ['risk', () => riskScenario(maxPlusOne)],
-    ['treatment', () => treatmentScenario(maxPlusOne)],
-  ] as const)('%s: invariants hold, nothing is overwritten, the new record is persisted unchanged', async (_name, run) => {
-    const s = await (run as () => Promise<Scenario<{ id: string }>>)();
+// ── D1 regression (was a known defect; fixed by S1) ─────────────────────────
+describe('ID collision after deleting a record (D1 regression)', () => {
+  it.each(['first', 'middle', 'last'] as const)('asset: delete the %s record, then create — no live record is overwritten', async (which) => {
+    const s = await assetScenario(which);
     expectScenarioInvariants(s);
     expectNoOverwrite(s);
-    expect(collisionSymptom(s)).toEqual({ reusedId: null, lostRecords: [], growth: 1 });
+  });
+  it.each(['first', 'middle', 'last'] as const)('risk: delete the %s record, then create — no live record is overwritten', async (which) => {
+    const s = await riskScenario(which);
+    expectScenarioInvariants(s);
+    expectNoOverwrite(s);
+  });
+  it.each(['first', 'middle', 'last'] as const)('treatment: delete the %s record, then create — no live record is overwritten', async (which) => {
+    const s = await treatmentScenario(which);
+    expectScenarioInvariants(s);
+    expectNoOverwrite(s);
   });
 });
 
-describe('ID allocation — mechanism and contrast', () => {
-  // In defect mode (`npm run test:defects`) the bodies above also show the
-  // consequence: a surviving record is replaced in place and the count drops.
-  it('documents the mechanism: genId is length-based', () => {
-    expect(genId('AST', { length: 99 })).toBe('AST-100');
+// ── Relationships survive delete + create (R2 path closed by S1) ────────────
+describe('relationships are not moved by a create after a delete', () => {
+  it('risks keep pointing at the same asset content; treatments at the same risk content', async () => {
+    const repo = new LocalStorageRepo();
+    const assetsBefore = new Map((await repo.listAssets()).map((a) => [a.id, a]));
+    const risksBefore = new Map((await repo.listRisks()).map((r) => [r.id, r]));
+
+    await repo.deleteAsset('AST-001');
+    await repo.deleteRisk('RSK-002');
+    await repo.saveAsset({ ...assetsBefore.get('AST-050')!, id: genId('AST', await repo.listAssets()), name: 'New asset (test)' });
+    await repo.saveRisk({ ...risksBefore.get('RSK-050')!, id: genId('RSK', await repo.listRisks()), threat: 'New risk (test)' });
+
+    const assetsAfter = new Map((await repo.listAssets()).map((a) => [a.id, a]));
+    const risksAfter = new Map((await repo.listRisks()).map((r) => [r.id, r]));
+    for (const r of risksAfter.values()) {
+      if (r.threat === 'New risk (test)') continue;
+      for (const aid of r.assetIds) expect(assetsAfter.get(aid), `${r.id} → ${aid}`).toEqual(assetsBefore.get(aid));
+    }
+    for (const t of await repo.listTreatments()) {
+      for (const rid of t.riskIds) expect(risksAfter.get(rid), `${t.id} → ${rid}`).toEqual(risksBefore.get(rid));
+    }
+  });
+});
+
+// ── Still open: R15, out-of-date reference retargeting (closed only by S5) ──
+// Delete the HIGHEST parent; S1 allocates highest+1 over the remaining ids and
+// so reissues the deleted id; an out-of-date child copy that still references
+// it is then saved and silently links to the NEW, unrelated parent.
+describe('R15 — out-of-date reference attaches to a reissued id (known defect until S5)', () => {
+  knownDefect('an out-of-date risk referencing a deleted asset does not link to a new, unrelated asset', {
+    observe: async () => {
+      const repo = new LocalStorageRepo();
+      const risk = (await repo.listRisks()).find((r) => r.assetIds.length === 1 && r.assetIds[0] !== 'AST-100')!;
+      const linked: Risk = { ...risk, assetIds: [risk.assetIds[0], 'AST-100'] };
+      await repo.saveRisk(linked);
+      const staleCopy = { ...linked }; // e.g. an open edit form / another tab
+      await repo.deleteAsset('AST-100');
+      const newAssetId = genId('AST', await repo.listAssets());
+      await repo.saveAsset({ ...(await repo.listAssets())[0], id: newAssetId, name: 'Unrelated new asset (test)' });
+      await repo.saveRisk(staleCopy);
+      const saved = (await repo.listRisks()).find((r) => r.id === linked.id)!;
+      return { newAssetId, saved, deletedAssetGone: !(await repo.listAssets()).some((a) => a.id === 'AST-100' && a.name !== 'Unrelated new asset (test)') };
+    },
+    invariants: (o) => { expect(o.saved).toBeDefined(); expect(o.deletedAssetGone).toBe(true); },
+    correct: (o) => expect(o.saved.assetIds).not.toContain(o.newAssetId),
+    symptom: (o) => ({ newAssetId: o.newAssetId, riskLinksNewAsset: o.saved.assetIds.includes(o.newAssetId) }),
+    documented: { newAssetId: 'AST-100', riskLinksNewAsset: true },
   });
 
-  it('contrast: createLocalRepo.nextId (standalone modules) uses the highest number, so it does not collide', () => {
+  knownDefect('an out-of-date treatment referencing a deleted risk does not link to a new, unrelated risk', {
+    observe: async () => {
+      const repo = new LocalStorageRepo();
+      const t = (await repo.listTreatments()).find((x) => x.riskIds.length === 1 && x.riskIds[0] !== 'RSK-204')!;
+      const linked: Treatment = { ...t, riskIds: [t.riskIds[0], 'RSK-204'] };
+      await repo.saveTreatment(linked);
+      const staleCopy = { ...linked };
+      await repo.deleteRisk('RSK-204');
+      const newRiskId = genId('RSK', await repo.listRisks());
+      await repo.saveRisk({ ...(await repo.listRisks())[0], id: newRiskId, threat: 'Unrelated new risk (test)' });
+      await repo.saveTreatment(staleCopy);
+      const saved = (await repo.listTreatments()).find((x) => x.id === linked.id)!;
+      return { newRiskId, saved };
+    },
+    invariants: (o) => expect(o.saved).toBeDefined(),
+    correct: (o) => expect(o.saved.riskIds).not.toContain(o.newRiskId),
+    symptom: (o) => ({ newRiskId: o.newRiskId, treatmentLinksNewRisk: o.saved.riskIds.includes(o.newRiskId) }),
+    documented: { newRiskId: 'RSK-204', treatmentLinksNewRisk: true },
+  });
+});
+
+describe('ID allocation — contrast', () => {
+  it('createLocalRepo.nextId (standalone modules) does not collide after deleting a middle record', () => {
     const repo = createLocalRepo<{ id: string; name: string }>({
       key: 'test.collision.v1',
       seed: [{ id: 'X-001', name: 'a' }, { id: 'X-002', name: 'b' }, { id: 'X-003', name: 'c' }],

@@ -72,10 +72,12 @@ describe('importCsvText (Vendor spec)', () => {
     expect(r.rows[0].name).toBe('=HYPERLINK(1)');
   });
 
-  it('allocates ids after the highest existing number and skips taken ones', () => {
+  it('allocates ids after the highest number taken so far (existing + this file) and skips taken ones', () => {
     const existing = [vendor('VEN-01'), vendor('VEN-09')];
     const r = importCsvText(vendorIo, 'ID,Name\n,A\nVEN-20,B\n,C\n', existing);
-    expect(r.rows.map((v) => v.id)).toEqual(['VEN-10', 'VEN-20', 'VEN-11']);
+    // Since ID-integrity S1 the shared allocator also counts ids taken earlier
+    // in the same file, so the third row gets VEN-21 (was VEN-11; both unique).
+    expect(r.rows.map((v) => v.id)).toEqual(['VEN-10', 'VEN-20', 'VEN-21']);
   });
 
   it('handles quoted fields, BOM, CRLF and blank lines', () => {

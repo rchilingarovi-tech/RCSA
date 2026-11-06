@@ -5,6 +5,7 @@
 // Blank cells on update rows mean "keep the existing value".
 import { downloadCsv } from './csv';
 import { today } from '../domain/scoring';
+import { createIdAllocator, idAllocationMessage } from '../data/ids';
 
 export interface RowError {
   row: number; // 1-based spreadsheet row (header = row 1)
@@ -118,12 +119,12 @@ export function importCsvText<T extends { id: string }>(
 
   const byId = new Map(existing.map((x) => [x.id.toUpperCase(), x]));
   const used = new Set(existing.map((x) => x.id));
-  let maxN = 0;
-  const re = new RegExp(`^${spec.idPrefix}-(\\d+)$`, 'i');
-  used.forEach((id) => { const m = id.match(re); if (m) maxN = Math.max(maxN, Number(m[1])); });
+  // Shared safe allocator (data/ids.ts), built once per import and updated
+  // incrementally: bounded, always terminates, never returns a taken id.
+  // Throws IdAllocationError at the numbering limit.
+  const allocator = createIdAllocator(spec.idPrefix, used, spec.pad);
   const nextId = (): string => {
-    do { maxN += 1; } while (used.has(`${spec.idPrefix}-${String(maxN).padStart(spec.pad, '0')}`));
-    const id = `${spec.idPrefix}-${String(maxN).padStart(spec.pad, '0')}`;
+    const id = allocator.next();
     used.add(id);
     return id;
   };
@@ -157,7 +158,18 @@ export function importCsvText<T extends { id: string }>(
       continue;
     }
 
-    const id = prev ? prev.id : idRaw && !used.has(idRaw) ? (used.add(idRaw), idRaw) : nextId();
+    let id: string;
+    if (prev) id = prev.id;
+    else if (idRaw && !used.has(idRaw)) { used.add(idRaw); allocator.reserve(idRaw); id = idRaw; }
+    else {
+      try {
+        id = nextId();
+      } catch (err) {
+        result.errors.push({ row: rowNum, field: 'ID', message: idAllocationMessage(err) });
+        result.skipped += 1;
+        continue;
+      }
+    }
     result.rows.push(spec.build({ ...(draft as Partial<T>), id }, prev));
     if (prev) result.updated += 1;
     else result.created += 1;

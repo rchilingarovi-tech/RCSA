@@ -100,3 +100,22 @@ Before acting, the receiver checks the handover against the repository:
 - **Request.** Give the base (`develop`), the scope and the specific risks to check. When Claude implements, it uses the Codex plugin, and both review layers are required (committed, and pending; see `CLAUDE.md`). Reviews are read-only. The stop-time review gate stays **off** unless the user enables it.
 - **Report.** Give a verdict (for example ACCEPT, ACCEPT WITH CHANGES or REJECT). List the findings by severity with file and line, each marked *verified* or *plausible*, and say which checks the reviewer actually executed.
 - **The implementer's response.** For each finding, record fixed, disagreed (with the reason) or deferred (with approval). Never quietly drop a finding.
+
+## 7. Status communication protocol
+
+The user must always know which assistant is working and whether a review is pending. Use these exact headings at the moment they apply:
+
+| Heading | Use it when | Must include |
+|---|---|---|
+| **CLAUDE WORK COMPLETE — CODEX REVIEW STARTED** | The work is finished and a Codex review has been launched. | Review scope (base, and which layers: committed, staged, unstaged, untracked); job ID if available; foreground or background. |
+| **WAITING FOR CODEX** | Codex is still running. | A clear statement that **no verdict has been received yet**; the job ID and how to check it (`/codex:status <job>`, `/codex:result <job>`, or the companion script's `status`/`result`). |
+| **CODEX REVIEW COMPLETED** | The actual review output has been read, and only then. | Verdict; findings with severity; the checks **Codex executed**, kept separate from checks run by Claude; required corrections. |
+| **READY FOR USER APPROVAL** | The necessary review is complete and blocking findings are resolved. | Exactly what needs approval (commit, push, implementation stage, …) and the current Git state. |
+
+Rules:
+- **No early completion.** Never report an assignment as complete while a review is running.
+- **No invented verdicts.** Never predict or invent a verdict.
+- **No duplicate reviews.** Don't launch a second review just because a background result hasn't appeared yet. Check its status instead.
+- **No promised resumption.** Promise to resume after a background job only if the integration guarantees it. Otherwise tell the user how to check the job.
+- **Who verified what.** Keep work executed by Claude separate from work independently verified by Codex.
+- **Thresholds.** The usage thresholds and checkpoint/handover rules (§2–§4) still apply. Status headings never replace a required handover.

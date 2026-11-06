@@ -125,9 +125,9 @@ describe('parseAssetsFile', () => {
 
   it('keeps an unknown explicit id, and gives a duplicate within the same file a fresh unique id', async () => {
     const r = await parseAssetsFile(csvFile('Asset ID,Name\nAST-500,A\nAST-500,B\n'), []);
-    // The allocator's counter starts from the ids that existed BEFORE the file,
-    // so the duplicate gets AST-001 here (unique, just not "next after 500").
-    expect(r.rows.map((a) => a.id)).toEqual(['AST-500', 'AST-001']);
+    // Since ID-integrity S1 the shared allocator counts ids taken earlier in the
+    // same file, so the duplicate gets AST-501 (was AST-001; both unique).
+    expect(r.rows.map((a) => a.id)).toEqual(['AST-500', 'AST-501']);
     expect(r.created).toBe(2);
   });
 });

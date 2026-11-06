@@ -5,6 +5,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Ring } from '../../components/charts/Ring';
 import { PageHeader } from '../rcsa/PageHeader';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { complianceRepo } from './repo';
 import {
@@ -45,8 +46,10 @@ function ControlModal({
     e.preventDefault();
     if (!ref.trim()) { ui.toast('Enter a control reference.', 'bg-orange-600'); return; }
     if (!title.trim()) { ui.toast('Enter a control title.', 'bg-orange-600'); return; }
+    const id = editing ? editing.id : allocateOrReport(() => complianceRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     onSave({
-      id: editing ? editing.id : complianceRepo.nextId(),
+      id,
       framework,
       ref: ref.trim(),
       title: title.trim(),

@@ -3,6 +3,7 @@ import type { RcsaRepository } from './repository';
 import { SEED_ASSETS, SEED_RISKS, SEED_TREATMENTS } from './seed';
 import { today } from '../domain/scoring';
 import { auditLog, diffFields } from '../audit/auditLog';
+import { createIdAllocator } from './ids';
 
 const ASSETS_KEY = 'rcsa.assets.v1';
 const RISKS_KEY = 'rcsa.risks.v1';
@@ -36,15 +37,16 @@ function migrateRisk(raw: LegacyRisk): Risk {
 /** Derive Treatment entities from legacy risks that carried embedded plan fields. */
 function deriveTreatments(legacy: LegacyRisk[]): Treatment[] {
   const out: Treatment[] = [];
-  let n = 0;
+  // Shared safe allocator, built once (linear). With no treatments stored yet
+  // this yields TRT-001, TRT-002, … exactly as before.
+  const ids = createIdAllocator('TRT', [], 3);
   legacy.forEach((r) => {
     const hasPlan =
       !!r.actionPlan || !!r.deadline || !!r.responsible || (!!r.treatmentStatus && r.treatmentStatus !== 'Open');
     if (!hasPlan) return;
-    n += 1;
     const title = (r.actionPlan && r.actionPlan.trim()) || 'Treatment plan';
     out.push({
-      id: `TRT-${String(n).padStart(3, '0')}`,
+      id: ids.next(),
       riskIds: [r.id],
       title: title.length > 60 ? `${title.slice(0, 57)}…` : title,
       description: r.actionPlan || '',

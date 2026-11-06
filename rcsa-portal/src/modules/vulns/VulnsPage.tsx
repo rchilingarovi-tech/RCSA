@@ -8,6 +8,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { vulnIo } from './io';
@@ -75,8 +76,10 @@ function VulnModal({ vuln, onClose, onSave }: { vuln: Vuln | 'new'; onClose: () 
       const n = Number(cvss);
       if (!Number.isFinite(n) || n < 0 || n > 10) { ui.toast('CVSS must be a number between 0 and 10.', 'bg-orange-600'); return; }
     }
+    const id = e ? e.id : allocateOrReport(() => vulnRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     onSave({
-      id: e ? e.id : vulnRepo.nextId(),
+      id,
       title: title.trim(),
       source,
       ref: ref.trim(),

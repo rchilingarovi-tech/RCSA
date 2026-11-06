@@ -35,3 +35,4 @@ The shared rules are canonical in `AGENTS.md`, imported here:
   - Return Codex's output faithfully.
   - **Don't run `/codex:setup --enable-review-gate`** (or `--enable-review-gate` on the script) unless the user asks. The gate is currently disabled.
 - **Protected areas.** Before any change covered by `AGENTS.md` rule 2, stop and ask, even inside an approved task, unless that exact change was approved.
+- **Status messages.** Follow the status communication protocol in `docs/AI_HANDOFF.md` §7. Use its four headings exactly. Never report work as complete while a Codex review is pending.

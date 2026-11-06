@@ -1,4 +1,5 @@
 import type { Asset, Risk, Treatment } from '../data/models';
+import { allocateId } from '../data/ids';
 
 // Pure domain logic — ported verbatim from the prototype (New Version.html L544-548).
 
@@ -104,7 +105,12 @@ export function statusBadgeClass(status: string): string {
   return 'bg-gray-100 text-gray-700';
 }
 
-/** Generate the next id for a prefix based on array length (ported from genId L544). */
-export function genId(prefix: string, arr: { length: number }): string {
-  return `${prefix}-${String(arr.length + 1).padStart(3, '0')}`;
+/**
+ * Next free id for a prefix, from the ids already in the collection
+ * (shared safe allocator, data/ids.ts). Was based on the array LENGTH, which
+ * reissued a live record's id after any delete (defect D1). Throws
+ * IdAllocationError when the numbering limit is reached — callers must not save.
+ */
+export function genId(prefix: string, records: readonly { id: string }[]): string {
+  return allocateId(prefix, records.map((r) => r.id), 3);
 }
