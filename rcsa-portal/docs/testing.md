@@ -9,7 +9,7 @@ Tests never change application behaviour: they only import and exercise it.
 | Command | What it does | Expected result today |
 |---|---|---|
 | `npm test` | Normal run. Ordinary tests plus known-defect tests (see below). | **All green.** |
-| `npm run test:defects` | Defect mode. Each known defect runs its scenario, its invariants and its correct-behaviour assertion as an ordinary test, so the real assertion failure (the evidence of each bug) is printed. | **Exactly the known defects fail** (currently 17); everything else passes. A non-zero exit code is expected here. |
+| `npm run test:defects` | Defect mode. Each known defect runs its scenario, its invariants and its correct-behaviour assertion as an ordinary test, so the real assertion failure (the evidence of each bug) is printed. | **Exactly the known defects fail** (currently 18); everything else passes. A non-zero exit code is expected here. |
 | `npm run test:watch` | Watch mode for local development. | — |
 | `npm run build` | Type-checks application **and** test files (`tsc --noEmit`, strict), then builds. Test code is never bundled, and test files are excluded from Tailwind's class scan (`tailwind.config.js`), so they cannot change the production CSS. | Green. |
 
@@ -61,7 +61,7 @@ assertions with a *correct* allocator. A real fix would therefore flip those
 tests to "no longer reproduces". The invariants also check that the new record
 is persisted exactly once, exactly as created.
 
-### Current known defects (17 scenarios, 6 root causes)
+### Current known defects (18 scenarios, 7 root causes)
 
 | Root cause | Scenarios | File |
 |---|---|---|
@@ -71,6 +71,12 @@ is persisted exactly once, exactly as created.
 | RCSA CSV import: invalid inherent/residual scores silently become 1 / "not assessed" | 4 | `src/io/import.test.ts` |
 | Risk CSV export → import loses scores and keeps the formula-guard apostrophe | 2 | `src/io/import.test.ts` |
 | KPI history: blank entries parse as 0 data points | 2 | `src/modules/kpis/kpis.test.ts` |
+| Storage write failures are swallowed: on a fresh install, if **only** the treatment-seed write fails, treatments still initialise empty. This is the limit left by the treatment-initialisation fix. | 1 | `src/test/regressions/treatment-initialization.test.tsx` |
+
+`treatment-initialization.test.tsx` also contains **ordinary** regression tests
+for the fixed fresh-install defect. They use the real `AppStore`, every load
+order, and exact saved records and risk links. Guard tests cover the legacy
+migration, existing data and reset.
 
 ## Environment
 

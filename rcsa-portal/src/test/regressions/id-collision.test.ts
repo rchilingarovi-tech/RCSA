@@ -66,8 +66,8 @@ async function riskScenario(alloc: Alloc = genId): Promise<Scenario<Risk>> {
 
 async function treatmentScenario(alloc: Alloc = genId): Promise<Scenario<Treatment>> {
   const repo = new LocalStorageRepo();
-  // NB: treatments must be read before risks on a fresh store, otherwise the
-  // repo's legacy-migration path runs and returns an empty treatment set.
+  // Read order no longer matters on a fresh store: the treatment-initialisation
+  // fix seeds treatments together with risks (see treatment-initialization.test.tsx).
   const before = await repo.listTreatments();
   const deleted = before[Math.floor(before.length / 2)];
   await repo.deleteTreatment(deleted.id);
@@ -143,7 +143,7 @@ describe('ID collision — fixture', () => {
     const repo = new LocalStorageRepo();
     const last = <T extends { id: string }>(xs: T[]) => xs[xs.length - 1].id;
     expect(last(await repo.listAssets())).toBe('AST-100');
-    expect(last(await repo.listTreatments())).toBe('TRT-195'); // treatments before risks — see treatmentScenario
+    expect(last(await repo.listTreatments())).toBe('TRT-195');
     expect(last(await repo.listRisks())).toBe('RSK-204');
   });
 });

@@ -1,8 +1,8 @@
 # Development status
 
-**As of:** 2026-11-06, `develop` at `fa8e293` (merge of PR #1, the V1 testing
-foundation). `main` is at `bb880cc`, the stable baseline from before the testing
-foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
+**As of:** 2026-11-06, `develop` at `36ec4cf` (merge of PR #2), with the
+treatment initialisation fix on `feature/v1-treatment-initialization`. `main`
+is at `bb880cc`, the stable baseline from before the testing foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
 [`AI_HANDOFF.md`](AI_HANDOFF.md).
 
 > Update this file whenever a milestone lands or a defect is fixed or found.
@@ -48,10 +48,12 @@ foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
 |---|---|---|
 | V1 modules above | `develop`, `main` | Built before the testing work |
 | **Testing foundation** (PR #1) | `develop` at `fa8e293` (contains commit `123a47a`) | Independently reviewed by Codex; final verdict ACCEPT (as reported by the user) |
+| **AI workflow documents** (PR #2) | `develop` at `36ec4cf` | Reviewed by Codex: ACCEPT |
+| Milestone 3, application stabilisation: **treatment initialisation fix** | `feature/v1-treatment-initialization` (until it is merged) | Fresh-install treatments are now seeded together with risks. Regression tests are in `treatment-initialization.test.tsx`. |
 
 **Testing foundation** (`rcsa-portal/docs/testing.md`):
-- 216 Vitest tests. They cover asset criticality, inherent and residual scoring, treatment status and overdue rules, compliance coverage, KPI RAG and attainment, vulnerability SLAs, and CSV parsing and validation.
-- 17 known-defect specifications (see §4).
+- 234 Vitest tests. They cover asset criticality, inherent and residual scoring, treatment status and overdue rules, compliance coverage, KPI RAG and attainment, vulnerability SLAs, CSV parsing and validation, and treatment initialisation.
+- 18 known-defect specifications (see §4).
 - A self-test of the known-defect mechanism.
 - A manual browser smoke test in `rcsa-portal/tests/browser-smoke/`: 46 assertions on a read-only path. This is **not** acceptance coverage.
 - Verification record: `rcsa-portal/docs/verification/2026-11-vite6-upgrade.md`.
@@ -71,7 +73,7 @@ foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
 
 Claude's earlier audit runs reported the same six packages before the Vite 6 upgrade (`develop` lockfile). Those results were reported in session and not recorded in the repository.
 
-## 4. Known defects with automated tests (17 scenarios, 6 root causes)
+## 4. Known defects with automated tests (18 scenarios, 7 root causes)
 
 Each scenario is a `knownDefect` spec that pins the **exact** current wrong behaviour. A passing test means the defect **still exists**.
 
@@ -83,6 +85,9 @@ Each scenario is a `knownDefect` spec that pins the **exact** current wrong beha
 | D4 | RCSA CSV import: an invalid score becomes 1, or "not assessed" for residual scores, with no error. | 4 | `src/io/import.test.ts` |
 | D5 | Risk export → import resets scores and keeps the apostrophe added to block spreadsheet formulas. | 2 | `src/io/import.test.ts` |
 | D6 | KPI history: blank entries are parsed as 0 data points. | 2 | `src/modules/kpis/kpis.test.ts` |
+| D7 | Storage write failures are swallowed. On a fresh install, if **only** the treatment-seed write fails while the risk write succeeds, treatments still initialise empty. This is the limit left by the initialisation fix; the root cause is the swallowed-write persistence defect in §5. | 1 | `src/test/regressions/treatment-initialization.test.tsx` |
+
+D1–D6 are the original 17 scenarios. D7 was added with the treatment-initialisation fix.
 
 ## 5. Additional verified defects (no automated test yet)
 
@@ -90,14 +95,16 @@ All of these were reported or reproduced by **Codex** during reviews. The last c
 
 | Area | Defect | Claude's confirmation |
 |---|---|---|
-| Initialisation | In a fresh browser, the seeded treatments are lost when risks load before treatments: the app shows 0 treatments, and the dashboard shows 0 overdue (`src/data/localStorageRepo.ts:105`). | Observed in browser smoke runs; code confirmed |
-| Persistence | Storage write failures are swallowed, so a save can report success and still lose the change (`localStorageRepo.ts:89`, `createLocalRepo.ts`). | Code confirmed |
+| Initialisation | **Fixed on `feature/v1-treatment-initialization`; not yet merged.** In a fresh browser, the seeded treatments were lost when risks loaded before treatments, and `[]` was persisted. The fix seeds treatments with risks only when neither is stored, and regression tests cover it. Browsers that already saved `[]` are deliberately **not** repaired automatically: that state can't be told apart from a user deleting every treatment. Use "Reset demo data", which also resets assets and risks. | Reproduced and tested |
+| Persistence | Storage write failures are swallowed, so a save can report success and still lose the change (`localStorageRepo.ts:89`, `createLocalRepo.ts`). One consequence is tested as D7. | Code confirmed |
+| Legacy migration | The one-time legacy migration can **permanently lose embedded treatment plans** in two ways:<br>• it writes the cleaned risks even if writing the derived treatments failed (`localStorageRepo.ts:157-158`);<br>• saving a risk before the migration has run persists the cleaned risks without the plans (`saveRisk()`, `localStorageRepo.ts:174`).<br>Only affects browsers that still hold pre-treatment legacy data. | Reported and reproduced by Codex (2026-11-06); code confirmed by Claude |
+| Initialisation, other paths | Invalid stored risks with no treatments stored can persist `[]` for both collections. Malformed treatment JSON falls back to the demo treatments, even next to custom risks. Initialisation in two tabs at once can overwrite another tab's save. | Reported by Codex (2026-11-06); not reproduced by Claude |
 | Persistence | Two concurrent saves: the second overwrites the first (lost update). | Reported by Codex only; consistent with the code's read-change-write pattern |
 | CSV integrity | **Round-trip losses** when an export is re-imported:<br>• asset evidence, and risk evidence and comments, are erased (the exports have no such columns);<br>• a treatment exported with the computed `Overdue` status is rejected on import;<br>• treatment comments are exported joined with `" \| "` and come back as a single comment. | Code confirmed (`src/csv/export.ts`, `src/io/import.ts`) |
 | CSV integrity | The RCSA importer numbers error rows after removing blank lines, so an error is reported against the wrong spreadsheet row (`import.ts:97`). | Code confirmed |
 | ID collisions | See D1; covered by tests. | Tests |
 | Audit integrity | Audit diffs compare the **140-character truncated** display text, so an edit beyond the first 140 characters is not recorded (`src/audit/auditLog.ts:46`). | Code confirmed |
-| Audit integrity | When an asset is deleted, the risks and treatments deleted with it are not audited (`localStorageRepo.ts:181`). | Code confirmed |
+| Audit integrity | When an asset is deleted, the risks and treatments deleted with it are not audited (`localStorageRepo.ts:198`). | Code confirmed |
 | Vulnerability dates | The CSV import accepts any discovery-date text (`src/modules/vulns/io.ts:17`). An invalid date makes the SLA deadline `NaN`, so the record is **never flagged as breached**. | Missing validation confirmed in code; the `NaN` outcome was reproduced by Codex only |
 | KPI presentation | A KPI with fewer than 2 history points is shown as "improving" (`src/modules/kpis/KpisPage.tsx:24`). The policy for a target of 0 needs a decision. | Code confirmed (first point only) |
 
@@ -108,8 +115,9 @@ These are **proposed; each needs user approval.** Items 1–4 affect protected a
 1. **Stop the data loss:** D1 (ID allocation) and D2 (custom controls).
 2. **CSV integrity:** D3–D5, the §5 round-trip losses and the row numbering.
 3. **Persistence:**
-   - report storage write failures to the user;
-   - fix the initialisation order;
+   - report storage write failures to the user (this also resolves D7);
+   - ~~fix the initialisation order~~ (done on `feature/v1-treatment-initialization`, pending merge);
+   - make the legacy migration safe against partial writes;
    - audit cascade deletes and compare audit values in full.
 4. **Input validation:** vulnerability discovery dates. Decide the KPI zero-target and short-history policy.
 5. **Engineering:**

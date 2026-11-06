@@ -160,7 +160,7 @@ try {
   await evaluate(`__nav('Treatment Catalogue').click()`);
   await waitFor(`__header().startsWith('Treatment Catalogue')`, 'treatment catalogue');
   observe('Treatment Catalogue: count text on a fresh browser', await evaluate(`(__main().match(/\\d+ treatments?/) || [''])[0]`),
-    'PRE-EXISTING DEFECT, not asserted: on a fresh profile the seeded treatments are lost when risks load first (LocalStorageRepo initialisation).');
+    'Not asserted. Expected 195 since the treatment-initialisation fix (was 0: seeded treatments were lost when risks loaded first). Unit-tested in treatment-initialization.test.tsx.');
 
   // 5. Risk edit modal (opened and closed, never saved)
   await evaluate(`__nav('Risk Catalogue').click()`);
