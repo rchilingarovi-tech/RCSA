@@ -1,0 +1,132 @@
+# Development status
+
+**As of:** 2026-11-06, `develop` at `fa8e293` (merge of PR #1, the V1 testing
+foundation). `main` is at `bb880cc`, the stable baseline from before the testing
+foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
+[`AI_HANDOFF.md`](AI_HANDOFF.md).
+
+> Update this file whenever a milestone lands or a defect is fixed or found.
+> When you do, re-check every claim against the repository.
+
+## 1. V1 architecture (frontend-only prototype)
+
+- **Stack.** React 18.3 + TypeScript 5.9 (strict) + Vite 6.4 + Tailwind 3.4. The only runtime dependencies are `react` and `react-dom`. Charts are hand-built.
+- **Shell.** `rcsa-portal/src/components/layout/AppShell.tsx`. The menu and module list come from one registry, `rcsa-portal/src/modules/registry.tsx`. There is no URL router: the active module is kept in `localStorage`.
+- **State.** The RCSA modules (assets, risks, treatments) share a React context store (`src/state/AppStore.tsx`) behind an **async** repository interface (`src/data/repository.ts`). The other modules use a **synchronous** generic repository (`src/data/createLocalRepo.ts`), one instance per module.
+- **Cross-module views.** Dashboard, Master Calendar, Reports and the notification bell aggregate other modules' data through pure functions such as `src/modules/overview/aggregate.ts`.
+- **Persistence limitations.**
+  - Everything is in browser `localStorage`, per device and per browser profile, with no shared or multi-user data.
+  - Storage write failures are swallowed silently.
+  - A save reads the whole collection, changes it and writes it back, so the last writer wins.
+  - There is no server, backup or migration path yet.
+- **Security limitations** (documented in `PRODUCT.md`). These are UX gates, **not security controls**:
+  - Authentication and per-module RBAC run entirely in the browser.
+  - The session is a user id kept in `localStorage`.
+  - Passwords are hashed with a non-cryptographic demo hash.
+  - The demo "switch user" option needs no password.
+  - The audit trail is client-side and can be tampered with.
+  - Aggregate views do not filter their data by the user's module rights.
+
+## 2. Platform modules (21, from `src/modules/registry.tsx`)
+
+| Group | Modules |
+|---|---|
+| Overview | Dashboard · Master Calendar · Reports |
+| RCSA | RCSA Dashboard · Asset Catalogue · **Risk Catalogue**\* · **Treatment Catalogue**\* |
+| Risk & Compliance | **Compliance**\* · Audit Findings · Third-Party Vendors |
+| Security Operations | Incidents · Vulnerabilities |
+| Governance | Policy & Document Control · Committee Meetings · Access Reviews |
+| Planning & Performance | Department KPIs · Yearly Plan · Awareness Training |
+| Administration | Audit Log · Directory |
+| Footer | Settings |
+
+\* Business rules are protected. Other protected areas cut across modules: data models, persistence, CSV import/export, authentication, authorisation and audit. See `AGENTS.md`, rule 2.
+
+## 3. Completed milestones
+
+| Milestone | Where | Notes |
+|---|---|---|
+| V1 modules above | `develop`, `main` | Built before the testing work |
+| **Testing foundation** (PR #1) | `develop` at `fa8e293` (contains commit `123a47a`) | Independently reviewed by Codex; final verdict ACCEPT (as reported by the user) |
+
+**Testing foundation** (`rcsa-portal/docs/testing.md`):
+- 216 Vitest tests. They cover asset criticality, inherent and residual scoring, treatment status and overdue rules, compliance coverage, KPI RAG and attainment, vulnerability SLAs, and CSV parsing and validation.
+- 17 known-defect specifications (see §4).
+- A self-test of the known-defect mechanism.
+- A manual browser smoke test in `rcsa-portal/tests/browser-smoke/`: 46 assertions on a read-only path. This is **not** acceptance coverage.
+- Verification record: `rcsa-portal/docs/verification/2026-11-vite6-upgrade.md`.
+
+**Toolchain:** Vite 6.4.5 · Vitest 4.1.12 · jsdom 25 · React Testing Library 16 · TypeScript 5.9.3. Node 26.13.0 is verified; Node 20 or later is required for tests. There is **no CI yet** and no coverage baseline.
+
+**Dependency audit:** `npm audit` run by Claude on 2026-11-06 in `rcsa-portal/` at `fa8e293`. It has not been verified independently; re-run `npm audit` before relying on these figures. It found 6 advisories (0 critical, 4 high, 2 moderate), all in development tooling (devDependencies):
+
+| Severity | Package | Dependency | Advisories |
+|---|---|---|---|
+| High | `postcss` | direct | GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849 |
+| High | `browserslist` | transitive | GHSA-c83g-rgw3-j3cx, GHSA-73wf-gq98-2v4g |
+| High | `nanoid` | transitive | GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 |
+| High | `source-map-js` | transitive | GHSA-68fv-2mgg-jv7q |
+| Moderate | `postcss-selector-parser` | transitive | GHSA-rj75-hqrm-r3gf |
+| Moderate | `baseline-browser-mapping` | transitive | GHSA-w5vr-8v7q-w6rv |
+
+Claude's earlier audit runs reported the same six packages before the Vite 6 upgrade (`develop` lockfile). Those results were reported in session and not recorded in the repository.
+
+## 4. Known defects with automated tests (17 scenarios, 6 root causes)
+
+Each scenario is a `knownDefect` spec that pins the **exact** current wrong behaviour. A passing test means the defect **still exists**.
+
+| # | Root cause | Scenarios | Test location |
+|---|---|---|---|
+| D1 | New Asset/Risk/Treatment IDs are based on collection length, so after a delete a new record **overwrites** an existing one (data loss). Protected. | 3 | `src/test/regressions/id-collision.test.ts` |
+| D2 | Editing a risk **drops its custom (non-catalogue) controls**, even when nothing is changed. Protected. | 1 | `src/test/regressions/custom-controls.test.tsx` |
+| D3 | RCSA CSV import: an invalid Yes/No asset flag becomes "No" with no error. | 5 | `src/io/import.test.ts` |
+| D4 | RCSA CSV import: an invalid score becomes 1, or "not assessed" for residual scores, with no error. | 4 | `src/io/import.test.ts` |
+| D5 | Risk export → import resets scores and keeps the apostrophe added to block spreadsheet formulas. | 2 | `src/io/import.test.ts` |
+| D6 | KPI history: blank entries are parsed as 0 data points. | 2 | `src/modules/kpis/kpis.test.ts` |
+
+## 5. Additional verified defects (no automated test yet)
+
+All of these were reported or reproduced by **Codex** during reviews. The last column says what **Claude** has independently confirmed.
+
+| Area | Defect | Claude's confirmation |
+|---|---|---|
+| Initialisation | In a fresh browser, the seeded treatments are lost when risks load before treatments: the app shows 0 treatments, and the dashboard shows 0 overdue (`src/data/localStorageRepo.ts:105`). | Observed in browser smoke runs; code confirmed |
+| Persistence | Storage write failures are swallowed, so a save can report success and still lose the change (`localStorageRepo.ts:89`, `createLocalRepo.ts`). | Code confirmed |
+| Persistence | Two concurrent saves: the second overwrites the first (lost update). | Reported by Codex only; consistent with the code's read-change-write pattern |
+| CSV integrity | **Round-trip losses** when an export is re-imported:<br>• asset evidence, and risk evidence and comments, are erased (the exports have no such columns);<br>• a treatment exported with the computed `Overdue` status is rejected on import;<br>• treatment comments are exported joined with `" \| "` and come back as a single comment. | Code confirmed (`src/csv/export.ts`, `src/io/import.ts`) |
+| CSV integrity | The RCSA importer numbers error rows after removing blank lines, so an error is reported against the wrong spreadsheet row (`import.ts:97`). | Code confirmed |
+| ID collisions | See D1; covered by tests. | Tests |
+| Audit integrity | Audit diffs compare the **140-character truncated** display text, so an edit beyond the first 140 characters is not recorded (`src/audit/auditLog.ts:46`). | Code confirmed |
+| Audit integrity | When an asset is deleted, the risks and treatments deleted with it are not audited (`localStorageRepo.ts:181`). | Code confirmed |
+| Vulnerability dates | The CSV import accepts any discovery-date text (`src/modules/vulns/io.ts:17`). An invalid date makes the SLA deadline `NaN`, so the record is **never flagged as breached**. | Missing validation confirmed in code; the `NaN` outcome was reproduced by Codex only |
+| KPI presentation | A KPI with fewer than 2 history points is shown as "improving" (`src/modules/kpis/KpisPage.tsx:24`). The policy for a target of 0 needs a decision. | Code confirmed (first point only) |
+
+## 6. Immediate priorities
+
+These are **proposed; each needs user approval.** Items 1–4 affect protected areas (`AGENTS.md` rule 2: business rules, persistence, CSV, audit), so each specific change needs explicit authorisation.
+
+1. **Stop the data loss:** D1 (ID allocation) and D2 (custom controls).
+2. **CSV integrity:** D3–D5, the §5 round-trip losses and the row numbering.
+3. **Persistence:**
+   - report storage write failures to the user;
+   - fix the initialisation order;
+   - audit cascade deletes and compare audit values in full.
+4. **Input validation:** vulnerability discovery dates. Decide the KPI zero-target and short-history policy.
+5. **Engineering:**
+   - CI (type-check, tests, build) and a coverage baseline;
+   - the development-dependency advisories (re-audit first; see §3);
+   - tests for §5.
+
+When a defect is fixed, convert its `knownDefect` test into a normal regression test (see `rcsa-portal/docs/testing.md`) and update §4 and §5.
+
+## 7. Planned V2: future work, not implemented
+
+None of the following exists in the repository today. Timing is undecided (`PRODUCT.md`).
+
+**Documented in the repository** (`PRODUCT.md`, `rcsa-portal/docs/ldap-ad-integration.md`):
+- Shared server-side persistence replacing `localStorage`. The repository interfaces in `src/data/` are the intended seam.
+- Server-side authentication against Active Directory or LDAP (handoff notes: `rcsa-portal/docs/ldap-ad-integration.md`), with RBAC enforced on the server.
+- A server-side, append-only audit trail.
+- Shared multi-user data with protection against concurrent overwrites.
+
+**Proposed technology: not an approved or recorded decision.** The user named a TypeScript/**NestJS** backend, **PostgreSQL** and **AWS** as the target for a migration-readiness review on 2026-11-05. There is no recorded decision that selects them. Treat them as proposals that need the user's approval before any design or implementation work.
