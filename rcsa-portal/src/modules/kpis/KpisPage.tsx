@@ -6,6 +6,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { kpiIo } from './io';
@@ -46,7 +47,9 @@ function KpiModal({ kpi, onClose, onSave }: { kpi: Kpi | 'new'; onClose: () => v
     if (!name.trim()) { ui.toast('Enter a KPI name.', 'bg-orange-600'); return; }
     const t = Number(target), c = Number(current);
     if (!Number.isFinite(t) || !Number.isFinite(c)) { ui.toast('Target and current must be numbers.', 'bg-orange-600'); return; }
-    onSave({ id: e ? e.id : kpiRepo.nextId(), name: name.trim(), target: t, current: c, unit: unit.trim(), direction, history: history.trim() });
+    const id = e ? e.id : allocateOrReport(() => kpiRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
+    onSave({ id, name: name.trim(), target: t, current: c, unit: unit.trim(), direction, history: history.trim() });
   }
 
   const field = 'w-full border rounded px-3 py-2 text-sm';

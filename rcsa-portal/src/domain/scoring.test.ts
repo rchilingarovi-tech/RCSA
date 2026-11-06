@@ -297,12 +297,15 @@ describe('risk ↔ treatment helpers', () => {
   });
 });
 
-describe('genId (current behaviour)', () => {
-  it('derives the next id from the array LENGTH, zero-padded to 3', () => {
+describe('genId (shared safe allocator since ID-integrity S1)', () => {
+  const recs = (...ids: string[]) => ids.map((id) => ({ id }));
+  it('allocates after the HIGHEST existing number, zero-padded to 3 (was: array length + 1)', () => {
     expect(genId('RSK', [])).toBe('RSK-001');
-    expect(genId('RSK', { length: 9 })).toBe('RSK-010');
-    expect(genId('AST', { length: 100 })).toBe('AST-101');
+    expect(genId('RSK', recs('RSK-001', 'RSK-009'))).toBe('RSK-010');
+    // A gap left by a delete is NOT refilled — the old length-based rule
+    // returned AST-002 here, i.e. an id still in use (defect D1).
+    expect(genId('AST', recs('AST-001', 'AST-003'))).toBe('AST-004');
   });
-  // The collision this causes after a delete is covered in
+  // Full allocator rules: src/data/ids.test.ts. Collision regressions:
   // src/test/regressions/id-collision.test.ts.
 });

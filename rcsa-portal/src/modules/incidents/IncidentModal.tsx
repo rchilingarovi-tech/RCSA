@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { FormSection } from '../../components/common/FormSection';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { today } from '../../domain/scoring';
 import { incidentRepo } from './repo';
 import {
@@ -56,8 +57,10 @@ export function IncidentModal({ incident, onClose, onSave }: { incident: Inciden
       ui.toast('Closure date cannot be before the time reported.', 'bg-orange-600'); return;
     }
 
+    const id = e ? e.id : allocateOrReport(() => incidentRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     onSave({
-      id: e ? e.id : incidentRepo.nextId(),
+      id,
       shortDesc: shortDesc.trim(),
       reportedAt,
       occurredAt,

@@ -6,6 +6,7 @@ import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { useUi } from '../common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { assetValue, criticality, genId, today } from '../../domain/scoring';
 import { ASSET_STATUSES, CIA_OPTIONS, DATA_CLASSES } from '../../domain/constants';
 import type { Asset, AssetStatus, CIA, DataClass, YesNo } from '../../data/models';
@@ -79,8 +80,10 @@ export function AssetModal({ editId }: { editId: string | null }) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const id = editId || allocateOrReport(() => genId('AST', store.assets), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     const obj: Asset = {
-      id: editId || genId('AST', store.assets),
+      id,
       name: form.name.trim(),
       process: form.process.trim(),
       department: form.department.trim(),

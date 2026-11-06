@@ -3,6 +3,7 @@
 // this only removes the duplicated CRUD boilerplate, it does not couple modules.
 // Migration-ready: swap this one factory for an HTTP/DB client later.
 import { auditLog, diffFields } from '../audit/auditLog';
+import { allocateId } from './ids';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
@@ -124,11 +125,9 @@ export function createLocalRepo<T extends { id: string }>(opts: {
       return fresh;
     },
     nextId(): string {
-      const max = read().reduce((m, x) => {
-        const n = Number(String(x.id).replace(/\D/g, ''));
-        return Number.isFinite(n) && n > m ? n : m;
-      }, 0);
-      return `${idPrefix}-${String(max + 1).padStart(pad, '0')}`;
+      // Shared safe allocator (data/ids.ts): never returns an ID already in the
+      // collection; throws IdAllocationError at the numbering limit.
+      return allocateId(idPrefix, read().map((x) => x.id), pad);
     },
   };
 }

@@ -7,6 +7,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { findingIo } from './io';
@@ -64,8 +65,10 @@ function FindingModal({ finding, onClose, onSave }: { finding: Finding | 'new'; 
     if (!title.trim()) { ui.toast('Enter a finding title.', 'bg-orange-600'); return; }
     if (!owner.trim()) { ui.toast('Enter a remediation owner.', 'bg-orange-600'); return; }
     if (!dueDate) { ui.toast('Set a remediation due date.', 'bg-orange-600'); return; }
+    const id = e ? e.id : allocateOrReport(() => findingsRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     onSave({
-      id: e ? e.id : findingsRepo.nextId(),
+      id,
       title: title.trim(),
       source,
       ref: ref.trim(),

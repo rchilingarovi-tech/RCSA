@@ -5,6 +5,7 @@ import { useStore } from '../../state/AppStore';
 import { useModals } from '../../state/ModalsProvider';
 import { usePermissions } from '../../auth/usePermissions';
 import { useUi } from '../common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { genId, riskLevel, today } from '../../domain/scoring';
 import {
   ASSESSMENTS, CONTROL_CATALOGUE, IMPACT_OPTIONS, LIKELIHOOD_OPTIONS,
@@ -139,8 +140,10 @@ export function RiskModal({ editId, assetId }: { editId: string | null; assetId:
     const checked = [...controls];
     if (form.customControl.trim()) checked.push(form.customControl.trim());
 
+    const id = editId || allocateOrReport(() => genId('RSK', store.risks), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
     const obj: Risk = {
-      id: editId || genId('RSK', store.risks),
+      id,
       assetIds: form.assetIds,
       threat: threatVal, customThreat, vuln: form.vuln.trim(), owner: form.owner.trim(),
       impact: form.impact, likelihood: form.likelihood,

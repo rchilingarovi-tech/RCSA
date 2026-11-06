@@ -6,6 +6,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { accessIo } from './io';
@@ -38,7 +39,9 @@ function AccessModal({ review, onClose, onSave }: { review: AccessReview | 'new'
     ev.preventDefault();
     if (!campaign.trim()) { ui.toast('Enter a campaign name.', 'bg-orange-600'); return; }
     const p = Math.max(0, Math.min(100, Number(progress) || 0));
-    onSave({ id: e ? e.id : accessRepo.nextId(), campaign: campaign.trim(), scope: scope.trim(), period: period.trim(), reviewer: reviewer.trim(), due, progress: p });
+    const id = e ? e.id : allocateOrReport(() => accessRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
+    onSave({ id, campaign: campaign.trim(), scope: scope.trim(), period: period.trim(), reviewer: reviewer.trim(), due, progress: p });
   }
 
   const field = 'w-full border rounded px-3 py-2 text-sm';

@@ -6,6 +6,7 @@ import { RowActions } from '../../components/common/RowActions';
 import { Pagination, usePaged } from '../../components/common/Pagination';
 import { useTableSort } from '../../components/common/useTableSort';
 import { useUi } from '../../components/common/UiProvider';
+import { allocateOrReport } from '../../data/ids';
 import { usePermissions } from '../../auth/usePermissions';
 import { ImportExport } from '../../components/common/ImportExport';
 import { planIo } from './io';
@@ -41,7 +42,9 @@ function PlanModal({ item, onClose, onSave }: { item: Initiative | 'new'; onClos
     ev.preventDefault();
     if (!initiative.trim()) { ui.toast('Enter an initiative name.', 'bg-orange-600'); return; }
     const p = Math.max(0, Math.min(100, Number(progress) || 0));
-    onSave({ id: e ? e.id : planRepo.nextId(), initiative: initiative.trim(), category, quarter, owner: owner.trim(), priority, progress: p });
+    const id = e ? e.id : allocateOrReport(() => planRepo.nextId(), (m) => ui.toast(m, 'bg-orange-600'));
+    if (!id) return; // allocation failed: nothing saved, form stays open
+    onSave({ id, initiative: initiative.trim(), category, quarter, owner: owner.trim(), priority, progress: p });
   }
 
   const field = 'w-full border rounded px-3 py-2 text-sm';
