@@ -1,6 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Test-only files are excluded so words in tests/comments (e.g. "grow") can
+  // never add utility classes to the production stylesheet.
+  content: [
+    './index.html',
+    './src/**/*.{ts,tsx}',
+    '!./src/**/*.test.{ts,tsx}',
+    '!./src/test/**',
+  ],
   theme: {
     extend: {
       colors: {

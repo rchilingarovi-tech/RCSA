@@ -106,7 +106,10 @@ finding (audit/regulator); vulnerability (scan/pentest); SLA breach; coverage
 - Three modules — **Risk Catalogue, Treatment Catalogue, Compliance** — are
   change-protected: their business logic must stay byte-identical unless explicitly
   authorized; only mechanical changes are allowed.
-- No automated test suite exists yet (known gap).
+- An automated test suite (Vitest) covers the core scoring, status, coverage,
+  KPI, SLA and CSV-import rules, plus documented known defects
+  (`docs/testing.md`). Coverage of the wider platform is still partial: no CI,
+  no coverage baseline yet.
 
 ## Brand Commitments
 
