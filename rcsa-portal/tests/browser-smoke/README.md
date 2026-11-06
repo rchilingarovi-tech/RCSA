@@ -35,7 +35,7 @@ step errors.
 |---|---|---|
 | `steps` | Actions performed (navigate, click, sign in). `completed` means only that the action ran without a timeout or error. | **No.** A completed step asserts nothing by itself. |
 | `assertions` | Explicit checks, each with an `expected` and an `actual` value and a PASS/FAIL result. | **Yes.** |
-| `observations` | Recorded facts that are *not* asserted: per-page row and SVG counts, gap-analysis statuses, browser problems including allow-listed ones. A known pre-existing defect is recorded here too: a fresh profile shows 0 treatments. | **No.** These are kept for comparison only. |
+| `observations` | Recorded facts that are *not* asserted: per-page row and SVG counts, gap-analysis statuses, browser problems including allow-listed ones. The Treatment Catalogue count on a fresh profile is recorded here too. It was 0 before the treatment-initialisation fix and should be 195 after it. | **No.** These are kept for comparison only. |
 | `pageText` | The full visible text of each visited page. | Only through `compare-smoke.mjs`. |
 
 `compare-smoke.mjs` compares assertions (including their actual values) and

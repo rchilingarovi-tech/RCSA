@@ -99,7 +99,24 @@ export class LocalStorageRepo implements RcsaRepository {
   }
 
   async listRisks(): Promise<Risk[]> {
+    this.seedTreatmentsOnFreshInstall();
     return this.read<LegacyRisk>(RISKS_KEY, SEED_RISKS as LegacyRisk[]).map(migrateRisk);
+  }
+
+  /**
+   * On a fresh install (neither risks nor treatments stored yet) seed the
+   * treatments together with the risks. Otherwise listTreatments() would see
+   * the just-seeded risks as legacy data and persist an empty treatment set.
+   * Any existing data — including legacy risks awaiting migration — is untouched.
+   */
+  private seedTreatmentsOnFreshInstall(): void {
+    try {
+      if (localStorage.getItem(RISKS_KEY) == null && localStorage.getItem(TREATMENTS_KEY) == null) {
+        this.write(TREATMENTS_KEY, SEED_TREATMENTS);
+      }
+    } catch {
+      /* storage unavailable — listTreatments() falls back to the seed */
+    }
   }
 
   async listTreatments(): Promise<Treatment[]> {
