@@ -1,7 +1,7 @@
 # Development status
 
-**As of:** 2026-11-06, `develop` at `f5d6df4` (merge of PR #3, the treatment
-initialisation fix), with ID-integrity stage S1 on `feature/v1-id-integrity`.
+**As of:** 2026-11-06, `develop` at `0793830` (merge of PR #4, ID-integrity
+stage S1). ID-integrity stages S2–S6 are not started.
 `main` is at `bb880cc`, the stable baseline from before the testing foundation. Rules: [`../AGENTS.md`](../AGENTS.md). Workflow:
 [`AI_HANDOFF.md`](AI_HANDOFF.md).
 
@@ -50,10 +50,10 @@ initialisation fix), with ID-integrity stage S1 on `feature/v1-id-integrity`.
 | **Testing foundation** (PR #1) | `develop` at `fa8e293` (contains commit `123a47a`) | Independently reviewed by Codex; final verdict ACCEPT (as reported by the user) |
 | **AI workflow documents** (PR #2) | `develop` at `36ec4cf` | Reviewed by Codex: ACCEPT |
 | Milestone 3, application stabilisation: **treatment initialisation fix** (PR #3) | `develop` at `f5d6df4` | Fresh-install treatments are now seeded together with risks. Regression tests are in `treatment-initialization.test.tsx`. Reviewed by Codex: ACCEPT. |
-| Milestone 4, **ID integrity stage S1** (shared safe ID allocator) | `feature/v1-id-integrity` (not yet committed or merged) | Design: `docs/ID_INTEGRITY_DESIGN.md`. Fixes D1 and R11. S2–S6 are pending. |
+| Milestone 4, **ID integrity stage S1** (shared safe ID allocator) | `develop` at `0793830` (contains commit `061bb35`) | Design: `docs/ID_INTEGRITY_DESIGN.md`. Fixes D1 and R11; R15 (D8) stays open. Reviewed by Codex: ACCEPT (`review-mw4s0k34-cyg35x`). S2–S6 are not started; each needs separate approval. |
 
 **Testing foundation** (`rcsa-portal/docs/testing.md`):
-- 316 Vitest tests. They cover asset criticality, inherent and residual scoring, treatment status and overdue rules, compliance coverage, KPI RAG and attainment, vulnerability SLAs, CSV parsing and validation, treatment initialisation, and record ID allocation.
+- 316 Vitest tests, as run by Codex on S1 (`review-mw4s0k34-cyg35x`). The merge `0793830` has the same tree as S1 commit `061bb35`. They cover asset criticality, inherent and residual scoring, treatment status and overdue rules, compliance coverage, KPI RAG and attainment, vulnerability SLAs, CSV parsing and validation, treatment initialisation, and record ID allocation.
 - 17 known-defect specifications (see §4).
 - A self-test of the known-defect mechanism.
 - A manual browser smoke test in `rcsa-portal/tests/browser-smoke/`: 46 assertions on a read-only path. This is **not** acceptance coverage.
@@ -80,7 +80,7 @@ Each scenario is a `knownDefect` spec that pins the **exact** current wrong beha
 
 | # | Root cause | Scenarios | Test location |
 |---|---|---|---|
-| ~~D1~~ | **Fixed by ID-integrity S1** (on `feature/v1-id-integrity`, not yet merged). Count-based IDs no longer overwrite a live record after a delete. Its 3 known-defect specs are now ordinary regression tests. | 0 | `src/test/regressions/id-collision.test.ts`, `src/data/ids.test.tsx` |
+| ~~D1~~ | **Fixed by ID-integrity S1** (PR #4, merged into `develop` at `0793830`). Count-based IDs no longer overwrite a live record after a delete. Its 3 known-defect specs are now ordinary regression tests. | 0 | `src/test/regressions/id-collision.test.ts`, `src/data/ids.test.tsx` |
 | D8 | **ID reuse (R15).** The ID of the deleted *highest* record can be reissued, so an out-of-date reference to it (an open edit form, another tab) attaches to the new, unrelated record. This affects Risk→Asset and Treatment→Risk. It is closed only by ID-integrity stage S5. Protected. | 2 | `src/test/regressions/id-collision.test.ts` |
 | D2 | Editing a risk **drops its custom (non-catalogue) controls**, even when nothing is changed. Protected. | 1 | `src/test/regressions/custom-controls.test.tsx` |
 | D3 | RCSA CSV import: an invalid Yes/No asset flag becomes "No" with no error. | 5 | `src/io/import.test.ts` |
@@ -114,11 +114,11 @@ All of these were reported or reproduced by **Codex** during reviews. The last c
 
 These are **proposed; each needs user approval.** Items 1–4 affect protected areas (`AGENTS.md` rule 2: business rules, persistence, CSV, audit), so each specific change needs explicit authorisation.
 
-1. **Stop the data loss:** ~~D1 (ID allocation)~~ (S1 done on `feature/v1-id-integrity`, pending merge), D2 (custom controls), then ID-integrity stages S2–S6 (`docs/ID_INTEGRITY_DESIGN.md`).
+1. **Stop the data loss:** ~~D1 (ID allocation)~~ (S1, PR #4, merged into `develop` at `0793830`), D2 (custom controls), then ID-integrity stages S2–S6 (`docs/ID_INTEGRITY_DESIGN.md`).
 2. **CSV integrity:** D3–D5, the §5 round-trip losses and the row numbering.
 3. **Persistence:**
    - report storage write failures to the user (this also resolves D7);
-   - ~~fix the initialisation order~~ (done on `feature/v1-treatment-initialization`, pending merge);
+   - ~~fix the initialisation order~~ (PR #3, merged into `develop` at `f5d6df4`);
    - make the legacy migration safe against partial writes;
    - audit cascade deletes and compare audit values in full.
 4. **Input validation:** vulnerability discovery dates. Decide the KPI zero-target and short-history policy.
