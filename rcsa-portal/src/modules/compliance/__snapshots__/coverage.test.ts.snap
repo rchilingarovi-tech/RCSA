@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`coverage(controls) > pins the per-framework coverage of the shipped demo data set 1`] = `
+{
+  "GDPR": 17,
+  "ISO 27001": 42,
+  "NIST CSF": 43,
+  "PCI-DSS": 50,
+  "SOC 2": 33,
+}
+`;

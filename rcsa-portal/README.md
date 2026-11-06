@@ -15,6 +15,8 @@ Other scripts:
 npm run build    # type-check (tsc --noEmit) + production build to dist/
 npm run preview  # serve the production build
 npm run lint     # type-check only
+npm test         # automated tests (Vitest), see docs/testing.md
+npm run test:defects  # show the evidence for documented known defects
 ```
 
 > Requires Node.js (LTS). No backend needed — data is mock + browser-local.
