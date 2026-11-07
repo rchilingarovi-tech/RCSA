@@ -1,11 +1,13 @@
-// ID integrity S2 — Step 1 regression tests (preview level): create-only
-// identity, strict CSV grammar, identity/reference columns, exact fail-closed
-// references and the armor-before-trim order.
-// Design: docs/ID_INTEGRITY_S2_DESIGN.md §3 and §9.1 (T-ID, T-Q, T-COL, T-REF,
+// ID integrity S2 — regression tests for create-only imports.
+// Step 1 (preview level): create-only identity, strict CSV grammar,
+// identity/reference columns, exact fail-closed references and the
+// armor-before-trim order (design §3, §9.1 T-ID, T-Q, T-COL, T-REF,
 // T-REF-ARMOR). "Blocked" = the preview has errors, so the UI cannot import
-// (asserted for the UIs in import-commit-ui.test.tsx). Commit-time and
-// zero-write assertions for the commit path belong to S2 steps 2-4.
-import { describe, expect, it, vi } from 'vitest';
+// (asserted for the UIs in import-commit-ui.test.tsx).
+// Step 2 (persistence core, data/importCommit.ts; design §4.1–§4.3, §9.1 T-S,
+// T-SE, T-L, T-P, T-W data part): see the sections at the end of this file.
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { commitNewRecords, readForImport, type ImportParent } from '../../data/importCommit';
 import type { Asset, Risk, Treatment } from '../../data/models';
 import { parseAssetsFile, parseRisksFile, parseTreatmentsFile, type ImportResult } from '../../io/import';
 import { exportRows, importCsvText, type ImportResult as TableResult, type IoSpec } from '../../lib/tableIo';
@@ -361,5 +363,356 @@ describe('T-REF: exact, fail-closed references on raw files', () => {
     const r = await parseRisksFile(csvFile('Asset ID,Threat\nAST-001,DDoS\nAST-404,DDoS\n'), [], [asset('AST-001')]);
     expect(r.rows).toHaveLength(1); // the preview still lists the valid row …
     blocked(r); // … but the file has an error, so nothing can be imported
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// S2 STEP 2 — persistence core (data/importCommit.ts)
+// ═════════════════════════════════════════════════════════════════════════════
+const ASSETS_KEY = 'rcsa.assets.v1';
+const RISKS_KEY = 'rcsa.risks.v1';
+const TREATMENTS_KEY = 'rcsa.treatments.v1';
+const ASSETS_TARGET = { key: ASSETS_KEY, label: 'Assets' };
+const RISKS_TARGET = { key: RISKS_KEY, label: 'Risks' };
+const TREATMENTS_TARGET = { key: TREATMENTS_KEY, label: 'Treatments', missingMessage: 'Treatments are not initialised in this browser. Nothing was imported.' };
+const ASSET_PARENT: ImportParent<Risk> = { key: ASSETS_KEY, label: 'assets', labels: { parent: 'asset', column: 'Asset ID' }, refsOf: (r) => r.assetIds };
+const RISK_PARENT: ImportParent<Treatment> = { key: RISKS_KEY, label: 'risks', labels: { parent: 'risk', column: 'Risk ID' }, refsOf: (t) => t.riskIds };
+
+const allKeys = () => Object.fromEntries(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)]));
+const store = (key: string, value: unknown) => localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+const treatment = (id: string, riskIds: string[]): Treatment => ({
+  id, riskIds, title: `T ${id}`, description: '', owner: '', dueDate: '', status: 'Open', evidence: [], comments: [], submittedAt: '2025-01-01',
+});
+const originalSetItem = Storage.prototype.setItem;
+const originalGetItem = Storage.prototype.getItem;
+
+/** Run `fn` and assert it made NO localStorage write call and changed no key. */
+function expectZeroWrites<R>(fn: () => R): R {
+  const before = allKeys();
+  const setItem = vi.spyOn(Storage.prototype, 'setItem');
+  const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
+  const out = fn();
+  expect(setItem, 'no setItem call').not.toHaveBeenCalled();
+  expect(removeItem, 'no removeItem call').not.toHaveBeenCalled();
+  setItem.mockRestore();
+  removeItem.mockRestore();
+  expect(allKeys(), 'every key unchanged').toEqual(before);
+  return out;
+}
+
+afterEach(() => { vi.restoreAllMocks(); });
+
+describe('Step 2: a verified create-only commit (T-P)', () => {
+  it('appends the preview rows after the existing records and verifies the read-back', async () => {
+    const assets = [asset('AST-001'), asset('AST-002')];
+    store(ASSETS_KEY, assets);
+    const preview = await parseAssetsFile(csvFile('Name\nNew A\nNew B\n'), assets);
+    expect(preview.errors).toEqual([]);
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: preview.rows });
+    expect(result.status).toBe('verified');
+    const stored = JSON.parse(localStorage.getItem(ASSETS_KEY)!) as Asset[];
+    expect(stored.map((a) => a.id)).toEqual(['AST-001', 'AST-002', 'AST-003', 'AST-004']);
+    expect(result).toMatchObject({ written: 2, records: stored });
+  });
+
+  it('end to end with the real parser: risks link exact assets; treatments link exact risks', async () => {
+    const assets = [asset('AST-001'), asset('AST-002')];
+    store(ASSETS_KEY, assets);
+    store(RISKS_KEY, []);
+    store(TREATMENTS_KEY, []);
+    const risks = await parseRisksFile(csvFile('Asset ID,Threat\n"AST-001; AST-002",DDoS\n'), [], assets);
+    expect(commitNewRecords({ target: RISKS_TARGET, rows: risks.rows, parent: ASSET_PARENT }).status).toBe('verified');
+    const storedRisks = JSON.parse(localStorage.getItem(RISKS_KEY)!) as Risk[];
+    expect(storedRisks.map((r) => [r.id, r.assetIds])).toEqual([['RSK-001', ['AST-001', 'AST-002']]]);
+    const trts = await parseTreatmentsFile(csvFile('Title,Risk ID\nPatch,RSK-001\n'), [], storedRisks);
+    expect(commitNewRecords({ target: TREATMENTS_TARGET, rows: trts.rows, parent: RISK_PARENT }).status).toBe('verified');
+    expect((JSON.parse(localStorage.getItem(TREATMENTS_KEY)!) as Treatment[]).map((t) => [t.id, t.riskIds])).toEqual([['TRT-001', ['RSK-001']]]);
+  });
+
+  it('existing records stay BYTE-identical, including hand-formatted JSON and legacy fields (T-L)', () => {
+    // Legacy risk shapes: embedded treatment-plan fields and a single assetId.
+    const raw = '[\n  {"id":"RSK-001","assetId":"AST-001","actionPlan":"Patch it","responsible":"Ops","deadline":"2025-01-01","treatmentStatus":"Open","threat":"DDoS"},\n' +
+      '  { "threat" : "Old" , "id" : "RSK-002", "impact": 1.0, "note": "caf\\u00e9" }\n]\n';
+    store(RISKS_KEY, raw);
+    store(ASSETS_KEY, [asset('AST-001')]);
+    const result = commitNewRecords({ target: RISKS_TARGET, rows: [risk('RSK-003')], parent: ASSET_PARENT });
+    expect(result.status).toBe('verified');
+    const after = localStorage.getItem(RISKS_KEY)!;
+    const j = raw.lastIndexOf(']');
+    expect(after.startsWith(raw.slice(0, j)), 'the stored prefix is untouched byte for byte').toBe(true);
+    expect(after.endsWith(raw.slice(j)), 'the closing bracket and trailing text are untouched').toBe(true);
+    expect(after.slice(j, after.length - (raw.length - j))).toBe(`,${JSON.stringify(risk('RSK-003'))}`);
+    const parsed = JSON.parse(after) as Record<string, unknown>[];
+    expect(parsed[0]).toMatchObject({ assetId: 'AST-001', actionPlan: 'Patch it', responsible: 'Ops', deadline: '2025-01-01', treatmentStatus: 'Open' });
+    expect(parsed.map((r) => r.id)).toEqual(['RSK-001', 'RSK-002', 'RSK-003']);
+  });
+
+  it('an empty stored array receives the rows; untouched keys are never written', () => {
+    store(ASSETS_KEY, []);
+    store(RISKS_KEY, '[{"id":"RSK-001"}]');
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    expect(commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-001')] }).status).toBe('verified');
+    expect(setItem.mock.calls.map(([k]) => k), 'exactly one write, to the target key').toEqual([ASSETS_KEY]);
+    expect(localStorage.getItem(RISKS_KEY)).toBe('[{"id":"RSK-001"}]');
+  });
+
+  it('commits never call a repository list/read, seed or migration (raw reads only)', () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+    commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-002')] });
+    // Reads: the target (Phase 1) and the target again (read-back) — nothing else.
+    expect(getItem.mock.calls.map(([k]) => k)).toEqual([ASSETS_KEY, ASSETS_KEY]);
+  });
+
+  it('appends 1,000 rows to 10,000 stored records quickly, preserving order', () => {
+    const existing = Array.from({ length: 10_000 }, (_, i) => asset(`AST-${String(i + 1).padStart(5, '0')}`));
+    store(ASSETS_KEY, existing);
+    const rows = Array.from({ length: 1_000 }, (_, i) => asset(`AST-${10_001 + i}`));
+    const t0 = performance.now();
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows });
+    const ms = performance.now() - t0;
+    expect(result.status).toBe('verified');
+    const stored = JSON.parse(localStorage.getItem(ASSETS_KEY)!) as Asset[];
+    expect(stored).toHaveLength(11_000);
+    expect(stored[9_999].id).toBe('AST-10000');
+    expect(stored[10_000].id).toBe('AST-10001');
+    expect(stored[10_999].id).toBe('AST-11000');
+    expect(ms, `took ${ms.toFixed(0)} ms`).toBeLessThan(3_000);
+  });
+});
+
+describe('Step 2: stale preview — rejected before any write (T-S)', () => {
+  it('an allocated ID taken after the preview is refused, exactly and as any collision variant', async () => {
+    for (const taken of ['AST-002', 'ast-002', 'AST-0002', ' AST-2 ']) {
+      localStorage.clear();
+      store(ASSETS_KEY, [asset('AST-001')]);
+      const preview = await parseAssetsFile(csvFile('Name\nNew\n'), [asset('AST-001')]);
+      expect(preview.rows[0].id).toBe('AST-002');
+      store(ASSETS_KEY, [asset('AST-001'), asset(taken)]); // "another tab"
+      const result = expectZeroWrites(() => commitNewRecords({ target: ASSETS_TARGET, rows: preview.rows }));
+      expect(result.status, taken).toBe('rejected');
+      expect(result.status === 'rejected' && result.reasons[0]).toMatch(/AST-002 \(or a variant of it\) was created after the preview/);
+    }
+  });
+
+  it('B-3, Risk → Asset: a parent deleted, made ambiguous or overlapped by a delimiter-bearing ID is refused', async () => {
+    const assets = [asset('AST-001'), asset('AST-010')];
+    const preview = await parseRisksFile(csvFile('Asset ID,Threat\n"AST-001; AST-010",DDoS\n'), [], assets);
+    expect(preview.errors).toEqual([]);
+    const cases: [string, Asset[], RegExp][] = [
+      ['deleted', [asset('AST-001')], /No asset "AST-010" exists/],
+      ['ambiguous', [...assets, asset('ast-010')], /is ambiguous/],
+      ['padding variant makes it ambiguous', [...assets, asset('AST-0010')], /is ambiguous/],
+      ['delimiter overlap', [...assets, asset('AST-010;AST-099')], /contains a list separator, so this cell may refer to it/],
+    ];
+    for (const [label, parents, message] of cases) {
+      localStorage.clear();
+      store(RISKS_KEY, []);
+      store(ASSETS_KEY, parents);
+      const result = expectZeroWrites(() => commitNewRecords({ target: RISKS_TARGET, rows: preview.rows, parent: ASSET_PARENT }));
+      expect(result.status, label).toBe('rejected');
+      expect(result.status === 'rejected' && result.reasons.join(' '), label).toMatch(message);
+      expect(result.status === 'rejected' && result.reasons.join(' ')).toMatch(/RSK-001: the linked asset "AST-010" changed after the preview/);
+    }
+  });
+
+  it('B-3, Treatment → Risk: the same checks', async () => {
+    const risks = [risk('RSK-001')];
+    const preview = await parseTreatmentsFile(csvFile('Title,Risk ID\nPatch,RSK-001\n'), [], risks);
+    for (const parents of [[], [risk('RSK-001'), risk('rsk-001')], [risk('RSK-001'), risk('RSK-001,RSK-002')]]) {
+      localStorage.clear();
+      store(TREATMENTS_KEY, []);
+      store(RISKS_KEY, parents);
+      const result = expectZeroWrites(() => commitNewRecords({ target: TREATMENTS_TARGET, rows: preview.rows, parent: RISK_PARENT }));
+      expect(result.status).toBe('rejected');
+    }
+  });
+
+  it('B-3: a parent edited after the preview with its ID unchanged is still accepted', async () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(RISKS_KEY, []);
+    const preview = await parseRisksFile(csvFile('Asset ID,Threat\nAST-001,DDoS\n'), [], [asset('AST-001')]);
+    store(ASSETS_KEY, [asset('AST-001', { name: 'Renamed elsewhere' })]);
+    expect(commitNewRecords({ target: RISKS_TARGET, rows: preview.rows, parent: ASSET_PARENT }).status).toBe('verified');
+  });
+
+  it('an empty batch or a batch with duplicate keys is refused without writing', () => {
+    store(ASSETS_KEY, []);
+    expect(expectZeroWrites(() => commitNewRecords({ target: ASSETS_TARGET, rows: [] })).status).toBe('rejected');
+    const dup = expectZeroWrites(() => commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-001'), asset('ast-1')] }));
+    expect(dup.status === 'rejected' && dup.reasons.join(' ')).toMatch(/appears twice/);
+  });
+});
+
+describe('Step 2: missing, malformed or unreadable storage — fail closed, zero writes (T-SE)', () => {
+  it.each([
+    ['missing target key', () => {}, /The stored Assets collection is missing/],
+    ['corrupt JSON', () => store(ASSETS_KEY, '[{"id":'), /The stored Assets data is unreadable/],
+    ['not an array', () => store(ASSETS_KEY, '{"id":"AST-001"}'), /unreadable/],
+    ['an element without a string id', () => store(ASSETS_KEY, '[{"id":"AST-001"},{"name":"x"}]'), /unreadable/],
+    ['an element that is not an object', () => store(ASSETS_KEY, '[{"id":"AST-001"},"AST-002"]'), /unreadable/],
+  ] as const)('%s', (_label, arrange, message) => {
+    arrange();
+    const result = expectZeroWrites(() => commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-900')] }));
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.reasons[0]).toMatch(message);
+  });
+
+  it('missing treatments with legacy risks stored: refused, no seed and no migration', () => {
+    store(RISKS_KEY, [{ id: 'RSK-001', assetId: 'AST-001', actionPlan: 'Keep me' }]);
+    const result = expectZeroWrites(() => commitNewRecords({ target: TREATMENTS_TARGET, rows: [treatment('TRT-001', ['RSK-001'])], parent: RISK_PARENT }));
+    expect(result).toEqual({ status: 'rejected', reasons: ['Treatments are not initialised in this browser. Nothing was imported.'] });
+    expect(localStorage.getItem(TREATMENTS_KEY)).toBeNull();
+  });
+
+  it('a missing or unreadable parent collection is refused (links cannot be verified)', () => {
+    for (const arrange of [() => {}, () => store(ASSETS_KEY, 'nope'), () => store(ASSETS_KEY, '[{"name":"no id"}]')]) {
+      localStorage.clear();
+      store(RISKS_KEY, []);
+      arrange();
+      const result = expectZeroWrites(() => commitNewRecords({ target: RISKS_TARGET, rows: [risk('RSK-001')], parent: ASSET_PARENT }));
+      expect(result.status === 'rejected' && result.reasons[0]).toMatch(/The stored assets cannot be read, so the links cannot be verified/);
+    }
+  });
+
+  it('getItem throwing (storage unavailable) is refused without writing', () => {
+    store(ASSETS_KEY, []);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
+    // (expectZeroWrites cannot snapshot keys here — every getItem throws.)
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-001')] });
+    expect(result).toEqual({ status: 'rejected', reasons: ['Browser storage is not available. Nothing was imported.'] });
+    expect(setItem, 'no write call').not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+    expect(localStorage.getItem(ASSETS_KEY)).toBe('[]');
+  });
+});
+
+describe('Step 2: write and read-back failures — honest outcomes, no retry, no rollback (T-W)', () => {
+  const arrange = () => { store(ASSETS_KEY, [asset('AST-001')]); return localStorage.getItem(ASSETS_KEY)!; };
+
+  it('setItem throws (quota) and the value is unchanged: REJECTED, nothing written, one attempt only', () => {
+    const before = arrange();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-002')] });
+    expect(result).toEqual({ status: 'rejected', reasons: ['Saving failed (browser storage is full or unavailable). Nothing was imported.'] });
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(ASSETS_KEY)).toBe(before);
+  });
+
+  it('setItem writes and then throws: UNCERTAIN, never retried, never rolled back', () => {
+    arrange();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      originalSetItem.call(this, k, v);
+      throw new Error('late failure');
+    });
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-002')] });
+    expect(result.status).toBe('uncertain');
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect((JSON.parse(localStorage.getItem(ASSETS_KEY)!) as Asset[]).map((a) => a.id)).toEqual(['AST-001', 'AST-002']);
+  });
+
+  it('setItem returns but the read-back differs (e.g. another tab wrote): UNCERTAIN, one attempt only', () => {
+    arrange();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string) {
+      originalSetItem.call(this, k, '[{"id":"AST-777"}]'); // what "another tab" left behind
+    });
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-002')] });
+    expect(result.status).toBe('uncertain');
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(ASSETS_KEY)).toBe('[{"id":"AST-777"}]'); // left as found: no rollback
+  });
+
+  it('the read-back throws: UNCERTAIN', () => {
+    arrange();
+    let wrote = false;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      originalSetItem.call(this, k, v);
+      wrote = true;
+    });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, k: string) {
+      if (wrote) throw new Error('read-back failed');
+      return originalGetItem.call(this, k);
+    });
+    const result = commitNewRecords({ target: ASSETS_TARGET, rows: [asset('AST-002')] });
+    expect(result.status).toBe('uncertain');
+  });
+});
+
+describe('Step 2: readForImport — the read-only refresh source (§4.6)', () => {
+  it('reports ok / missing / unreadable / unavailable without writing or normalising', () => {
+    expect(expectZeroWrites(() => readForImport(ASSETS_KEY))).toEqual({ status: 'missing' });
+    store(ASSETS_KEY, 'not json');
+    expect(expectZeroWrites(() => readForImport(ASSETS_KEY))).toEqual({ status: 'unreadable' });
+    store(ASSETS_KEY, '{"a":1}');
+    expect(readForImport(ASSETS_KEY)).toEqual({ status: 'unreadable' });
+    store(RISKS_KEY, [{ id: 'RSK-001', assetId: 'AST-001', actionPlan: 'kept' }]);
+    expect(expectZeroWrites(() => readForImport(RISKS_KEY))).toEqual({ status: 'ok', records: [{ id: 'RSK-001', assetId: 'AST-001', actionPlan: 'kept' }] });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied'); });
+    expect(readForImport(ASSETS_KEY)).toEqual({ status: 'unavailable' });
+  });
+});
+
+// ── Duplicate parent records with an IDENTICAL ID (Codex S2 step 2 review) ────
+// Two stored parents with exactly the same ID cannot be told apart, so any
+// reference to that ID is ambiguous — at preview and at commit (B-3). Stored
+// duplicates are never repaired, deduplicated or rewritten.
+describe('Duplicate parent IDs: rejected at preview and at commit, both relationships', () => {
+  it('Risk → Asset: duplicates already present before the preview block the file', async () => {
+    const assets = [asset('AST-010', { name: 'First' }), asset('AST-010', { name: 'Second' }), asset('AST-001')];
+    const r = await parseRisksFile(csvFile('Asset ID,Threat\nAST-001,DDoS\nAST-010,Fire\n'), [], assets);
+    expect(r.errors).toEqual([{ row: 3, field: 'Asset ID', message: '"AST-010" is ambiguous: 2 stored assets have exactly this ID. Link it in the form.' }]);
+    blocked(r); // the whole file is blocked, including the valid AST-001 row
+  });
+
+  it('Treatment → Risk: duplicates already present before the preview block the file', async () => {
+    const risks = [risk('RSK-010'), risk('RSK-010'), risk('RSK-001')];
+    for (const header of ['Risk ID', 'Risk IDs']) {
+      const r = await parseTreatmentsFile(csvFile(`Title,${header}\nOk,RSK-001\nX,"RSK-001; RSK-010"\n`), [], risks);
+      expect(r.errors, header).toEqual([{ row: 3, field: 'Risk ID', message: '"RSK-010" is ambiguous: 2 stored risks have exactly this ID. Link it in the form.' }]);
+      blocked(r);
+    }
+  });
+
+  it('Risk → Asset: a duplicate introduced after the preview is refused at commit with zero writes; nothing is repaired', async () => {
+    const assets = [asset('AST-001'), asset('AST-010')];
+    store(ASSETS_KEY, assets);
+    store(RISKS_KEY, []);
+    const preview = await parseRisksFile(csvFile('Asset ID,Threat\n"AST-001; AST-010",DDoS\n'), [], assets);
+    expect(preview.errors).toEqual([]);
+    const withDuplicate = '[' + [asset('AST-001'), asset('AST-010'), asset('AST-010', { name: 'Twin' })].map((a) => JSON.stringify(a)).join(',') + ']';
+    store(ASSETS_KEY, withDuplicate); // "another tab"
+    const result = expectZeroWrites(() => commitNewRecords({ target: RISKS_TARGET, rows: preview.rows, parent: ASSET_PARENT }));
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.reasons).toEqual([
+      'RSK-001: the linked asset "AST-010" changed after the preview. "AST-010" is ambiguous: 2 stored assets have exactly this ID. Link it in the form.',
+    ]);
+    expect(localStorage.getItem(ASSETS_KEY), 'stored duplicates are left exactly as found').toBe(withDuplicate);
+    expect(localStorage.getItem(RISKS_KEY)).toBe('[]');
+  });
+
+  it('Treatment → Risk: a duplicate introduced after the preview is refused at commit with zero writes; nothing is repaired', async () => {
+    const risks = [risk('RSK-001')];
+    store(RISKS_KEY, risks);
+    store(TREATMENTS_KEY, []);
+    const preview = await parseTreatmentsFile(csvFile('Title,Risk ID\nPatch,RSK-001\n'), [], risks);
+    expect(preview.errors).toEqual([]);
+    const withDuplicate = JSON.stringify([risk('RSK-001'), risk('RSK-001', { threat: 'Twin' })]);
+    store(RISKS_KEY, withDuplicate);
+    const result = expectZeroWrites(() => commitNewRecords({ target: TREATMENTS_TARGET, rows: preview.rows, parent: RISK_PARENT }));
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.reasons.join(' ')).toMatch(/TRT-001: the linked risk "RSK-001" changed after the preview\. "RSK-001" is ambiguous: 2 stored risks have exactly this ID/);
+    expect(localStorage.getItem(RISKS_KEY)).toBe(withDuplicate);
+    expect(localStorage.getItem(TREATMENTS_KEY)).toBe('[]');
+  });
+
+  it('control: unique parents and valid references still commit (preview and commit), unaffected by an unrelated duplicate', async () => {
+    const assets = [asset('AST-001'), asset('AST-099'), asset('AST-099')]; // duplicate, but not referenced
+    store(ASSETS_KEY, assets);
+    store(RISKS_KEY, []);
+    const preview = await parseRisksFile(csvFile('Asset ID,Threat\nAST-001,DDoS\n'), [], assets);
+    expect(preview.errors).toEqual([]);
+    expect(commitNewRecords({ target: RISKS_TARGET, rows: preview.rows, parent: ASSET_PARENT }).status).toBe('verified');
+    expect((JSON.parse(localStorage.getItem(RISKS_KEY)!) as Risk[]).map((r) => r.assetIds)).toEqual([['AST-001']]);
   });
 });

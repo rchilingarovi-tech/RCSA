@@ -106,6 +106,31 @@ describe('parseReferenceCell — armor before trailing trim (revision 6.1, R6-1)
   });
 });
 
+describe('buildParentIndex counts every raw record (Codex S2 step 2 review)', () => {
+  it('two records with exactly the same ID form an ambiguous group; nothing is deduplicated', () => {
+    const index = buildParentIndex(['AST-010', 'AST-010', 'AST-001']);
+    expect(index.groups.get(collisionKey('AST-010'))).toEqual(['AST-010', 'AST-010']);
+    expect(checkResolvedReference('AST-010', index, ASSET)).toBe('"AST-010" is ambiguous: 2 stored assets have exactly this ID. Link it in the form.');
+    expect(checkResolvedReference('AST-001', index, ASSET)).toBeNull(); // unique parents unaffected
+  });
+
+  it('identical duplicates mixed with a case/padding variant are ambiguous for every spelling', () => {
+    const index = buildParentIndex(['AST-010', 'AST-010', 'ast-0010']);
+    expect(index.groups.get(collisionKey('AST-010'))).toHaveLength(3);
+    for (const ref of ['AST-010', 'ast-0010']) {
+      expect(checkResolvedReference(ref, index, ASSET)).toMatch(/is ambiguous: stored assets .* differ only in case, spacing or zero-padding/);
+    }
+  });
+
+  it('parseReferenceCell rejects a reference to a duplicated ID (preview path)', () => {
+    expect(ids('AST-010', ['AST-010', 'AST-010'])).toEqual({
+      ids: [],
+      problems: ['"AST-010" is ambiguous: 2 stored assets have exactly this ID. Link it in the form.'],
+    });
+    expect(ids('AST-011', ['AST-010', 'AST-010', 'AST-011'])).toEqual({ ids: ['AST-011'], problems: [] });
+  });
+});
+
 describe('checkResolvedReference — the four step 5 checks (reused by B-3 in step 2)', () => {
   it('passes only for an exact, non-delimiter, single-member, non-overlapping ID', () => {
     const index = buildParentIndex(['AST-001', 'AST-500', 'ast-500', 'X;AST-009', 'AST-009']);

@@ -46,8 +46,10 @@ export function buildParentIndex(ids: Iterable<string>): ParentIndex {
   const delimiterBearing = new Set<string>();
   const splitTokens = new Set<string>();
   let hasBlankLike = false;
+  // Every RAW record is counted — identical IDs are NOT deduplicated — so two
+  // stored records with exactly the same ID form an ambiguous group (Codex S2
+  // step 2 review). Callers pass one ID per stored record.
   for (const id of ids) {
-    if (exact.has(id)) continue;
     exact.add(id);
     const key = collisionKey(id);
     const g = groups.get(key);
@@ -98,6 +100,9 @@ export function checkResolvedReference(id: string, index: ParentIndex, labels: R
   }
   const group = index.groups.get(key) ?? [];
   if (group.length > 1) {
+    if (group.every((g) => g === id)) {
+      return `"${showId(id)}" is ambiguous: ${group.length} stored ${labels.parent}s have exactly this ID. Link it in the form.`;
+    }
     return `"${showId(id)}" is ambiguous: stored ${labels.parent}s ${group.map((g) => `"${showId(g)}"`).join(' and ')} differ only in case, spacing or zero-padding. Link it in the form.`;
   }
   if (index.splitTokens.has(key)) {
