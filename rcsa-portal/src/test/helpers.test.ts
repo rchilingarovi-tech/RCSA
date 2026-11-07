@@ -90,13 +90,16 @@ describe('false-positive scenarios are rejected (real specs, fabricated observat
   });
 
   // Scenario 1 — different incorrect risk scores.
+  // Since ID integrity S2 the D5 round trip is a create-only copy: the observed
+  // row is a NEW risk RSK-002 (created: 1); identity lives in the invariant and
+  // scores are compared without IDs (design §9.2 / §9.3).
   it('scenario 1: a round trip that yields DIFFERENT wrong scores (3/1 instead of 1/1) is rejected', async () => {
-    const wrong = result<Risk>({ rows: [risk('RSK-001', { impact: 3, likelihood: 1 })], updated: 1 });
+    const wrong = result<Risk>({ rows: [risk('RSK-002', { impact: 3, likelihood: 1 })], created: 1 });
     await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), wrong))).rejects.toThrow(/changed symptom/);
   });
 
   it('scenario 1b: wrong scores with a residual value that is not the documented "not assessed" are rejected', async () => {
-    const wrong = result<Risk>({ rows: [risk('RSK-001', { impact: 1, likelihood: 1, resImpact: 1, resLikelihood: 1 })], updated: 1 });
+    const wrong = result<Risk>({ rows: [risk('RSK-002', { impact: 1, likelihood: 1, resImpact: 1, resLikelihood: 1 })], created: 1 });
     await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), wrong))).rejects.toThrow(/changed symptom/);
   });
 
@@ -112,11 +115,18 @@ describe('false-positive scenarios are rejected (real specs, fabricated observat
     await expect(evaluateKnownDefect(withObservation(roundTripApostropheDefect(), missing))).rejects.toThrow(/invariant failed/);
   });
 
-  it('scenario 2b: a round trip that imports a DIFFERENT risk, or creates instead of updating, is rejected', async () => {
-    const otherRisk = result<Risk>({ rows: [risk('RSK-999', { impact: 1, likelihood: 1 })], updated: 1 });
-    const created = result<Risk>({ rows: [risk('RSK-001', { impact: 1, likelihood: 1 })], created: 1 });
+  it('scenario 2b: a round trip that imports a DIFFERENT risk, or updates instead of creating, is rejected', async () => {
+    const otherRisk = result<Risk>({ rows: [risk('RSK-999', { impact: 1, likelihood: 1 })], created: 1 });
+    const updatedInstead = result<Risk>({ rows: [risk('RSK-002', { impact: 1, likelihood: 1 })], updated: 1, created: 0 });
     await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), otherRisk))).rejects.toThrow(/invariant failed/);
-    await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), created))).rejects.toThrow(/invariant failed/);
+    await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), updatedInstead))).rejects.toThrow(/invariant failed/);
+  });
+
+  // S2 (design §9.2, new 2c): identity and scores are asserted separately, so
+  // CORRECT scores on the WRONG identity must not read as a fix.
+  it('scenario 2c: preserved scores on the original ID (not a new record) are rejected (invariant)', async () => {
+    const wrongIdentity = result<Risk>({ rows: [risk('RSK-001', { impact: 5, likelihood: 4, resImpact: 3, resLikelihood: 2 })], created: 1 });
+    await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), wrongIdentity))).rejects.toThrow(/invariant failed/);
   });
 
   // Scenario 3 — an invalid row silently discarded, no diagnostics.
@@ -139,8 +149,8 @@ describe('false-positive scenarios are rejected (real specs, fabricated observat
   it('the CORRECT outcome is reported as "no longer reproduces" for each real spec', async () => {
     const rejectedAsset = result<Asset>({ errors: [{ row: 2, field: 'PCI', message: '"maybe" must be Yes or No' }], skipped: 1 });
     const rejectedRisk = result<Risk>({ errors: [{ row: 2, field: 'Impact', message: '"6" must be 1–5' }], skipped: 1 });
-    const preserved = result<Risk>({ rows: [risk('RSK-001', { impact: 5, likelihood: 4, resImpact: 3, resLikelihood: 2 })], updated: 1 });
-    const unarmoured = result<Risk>({ rows: [risk('RSK-001', { threat: '-Legacy VPN exposure' })], updated: 1 });
+    const preserved = result<Risk>({ rows: [risk('RSK-002', { impact: 5, likelihood: 4, resImpact: 3, resLikelihood: 2 })], created: 1 });
+    const unarmoured = result<Risk>({ rows: [risk('RSK-002', { threat: '-Legacy VPN exposure' })], created: 1 });
     await expect(evaluateKnownDefect(withObservation(invalidYesNoDefect('PCI'), rejectedAsset))).rejects.toThrow(/no longer reproduces/);
     await expect(evaluateKnownDefect(withObservation(invalidScoreDefect('Impact', '6'), rejectedRisk))).rejects.toThrow(/no longer reproduces/);
     await expect(evaluateKnownDefect(withObservation(roundTripScoresDefect(), preserved))).rejects.toThrow(/no longer reproduces/);

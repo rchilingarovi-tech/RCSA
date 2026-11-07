@@ -224,11 +224,17 @@ describe('CSV importers use the shared allocator', () => {
     expect(r.rows.map((x) => x.id)).toEqual(['VEN-02', 'VEN-03']);
   });
 
-  it('standalone importer: at the limit a blank-id row becomes a row error; other rows still import', () => {
+  // S2 (create-only), design §9.2 #11: the explicit VEN-05 row now also reports
+  // the create-only ID error, so the preview is blocked; the allocation error
+  // stays a row error.
+  it('standalone importer: at the limit a blank-id row becomes a row error; an explicit ID is rejected too', () => {
     const r = importCsvText(vendorIo, 'ID,Name\n,Needs id\nVEN-05,Explicit\n', [v(`VEN-${MAX_ID_NUMBER}`)]);
-    expect(r.rows.map((x) => x.id)).toEqual(['VEN-05']);
-    expect(r.skipped).toBe(1);
-    expect(r.errors).toEqual([{ row: 2, field: 'ID', message: expect.stringMatching(/numbering limit/) }]);
+    expect(r.rows).toEqual([]);
+    expect(r.skipped).toBe(2);
+    expect(r.errors).toEqual([
+      { row: 2, field: 'ID', message: expect.stringMatching(/numbering limit/) },
+      { row: 3, field: 'ID', message: expect.stringMatching(/creates new records only/) },
+    ]);
   });
 
   it('RCSA importer: blank ids skip ids already taken case-insensitively', async () => {
@@ -239,29 +245,44 @@ describe('CSV importers use the shared allocator', () => {
 
   // Codex S1 review finding 1: a REJECTED row must not reserve its explicit id
   // or advance numbering for later valid rows (develop imported AST-001 here).
+  // S2 (design §9.2 #12-14): the rejected row now also reports the create-only
+  // ID error; the valid row's preview ID proves numbering was not influenced.
   it('RCSA assets: a rejected row with an id at the limit does not exhaust numbering for a valid row', async () => {
     const r = await parseAssetsFile(csvFile(`Asset ID,Name\nAST-${MAX_ID_NUMBER},\n,Valid asset\n`), []);
     expect(r.rows.map((x) => [x.id, x.name])).toEqual([['AST-001', 'Valid asset']]);
-    expect(r.errors).toEqual([{ row: 2, field: 'Name', message: 'Name is required' }]);
+    expect(r.errors).toEqual([
+      { row: 2, field: 'Asset ID', message: expect.stringMatching(/creates new records only/) },
+      { row: 2, field: 'Name', message: 'Name is required' },
+    ]);
   });
 
   it('RCSA risks: a rejected row with an id at the limit does not exhaust numbering for a valid row', async () => {
     const assets = (await new LocalStorageRepo().listAssets()).slice(0, 1);
     const r = await parseRisksFile(csvFile(`Risk ID,Asset ID,Threat\nRSK-${MAX_ID_NUMBER},${assets[0].id},\n,${assets[0].id},DDoS\n`), [], assets);
     expect(r.rows.map((x) => x.id)).toEqual(['RSK-001']);
-    expect(r.errors).toEqual([{ row: 2, field: 'Threat', message: 'Threat is required' }]);
+    expect(r.errors).toEqual([
+      { row: 2, field: 'Risk ID', message: expect.stringMatching(/creates new records only/) },
+      { row: 2, field: 'Threat', message: 'Threat is required' },
+    ]);
   });
 
   it('RCSA treatments: a rejected row with an id at the limit does not exhaust numbering for a valid row', async () => {
     const risks = (await new LocalStorageRepo().listRisks()).slice(0, 1);
     const r = await parseTreatmentsFile(csvFile(`Treatment ID,Title,Risk ID\nTRT-${MAX_ID_NUMBER},,${risks[0].id}\n,Valid,${risks[0].id}\n`), [], risks);
     expect(r.rows.map((x) => x.id)).toEqual(['TRT-001']);
-    expect(r.errors).toEqual([{ row: 2, field: 'Title', message: 'Title is required' }]);
+    expect(r.errors).toEqual([
+      { row: 2, field: 'Treatment ID', message: expect.stringMatching(/creates new records only/) },
+      { row: 2, field: 'Title', message: 'Title is required' },
+    ]);
   });
 
-  it('a rejected row no longer blocks a later valid row from using the same explicit id', async () => {
+  // S2 (design §9.2 #15): was "a rejected row no longer blocks a later valid row
+  // from using the same explicit id". Explicit IDs can no longer be used, so the
+  // reservation behaviour is retired; both rows report the create-only error.
+  it('explicit IDs are rejected on every row, so no explicit ID is ever reserved', async () => {
     const r = await parseAssetsFile(csvFile('Asset ID,Name\nAST-777,\nAST-777,Valid\n'), []);
-    expect(r.rows.map((x) => x.id)).toEqual(['AST-777']);
+    expect(r.rows).toEqual([]);
+    expect(r.errors.map((e) => [e.row, e.field])).toEqual([[2, 'Asset ID'], [2, 'Name'], [3, 'Asset ID']]);
   });
 
   // Codex S1 review finding 2: batch allocation must stay linear (a quadratic

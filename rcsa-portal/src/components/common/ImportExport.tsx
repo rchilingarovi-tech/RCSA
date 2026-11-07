@@ -24,25 +24,45 @@ const btn = 'btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-mediu
 export function ImportExport<T extends { id: string }>({ spec, exportSource, existing, canImport, canExport, onImported }: Props<T>) {
   const ui = useUi();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<ImportResult<T> | null>(null);
+  // S2 stale-preview guard: each selection starts a new generation; the preview is
+  // tagged with the generation that produced it, and a read completing for an older
+  // generation is ignored. Only the latest, fully read selection can be imported.
+  const selection = useRef(0);
+  const [preview, setPreview] = useState<{ gen: number; res: ImportResult<T> } | null>(null);
+
+  const closePreview = () => {
+    selection.current += 1; // also invalidates any read still in flight
+    setPreview(null);
+  };
 
   const onFile = async (f: File | undefined) => {
-    if (!f) return;
+    const gen = ++selection.current;
+    setPreview(null); // the previous preview is invalid from this moment
+    if (!f) return; // selection cleared: nothing to read, nothing importable
     try {
       const text = await f.text();
+      if (gen !== selection.current) return;
       const res = importCsvText(spec, text, existing);
-      if (res.totalDataRows === 0) { ui.toast('No data rows found in that file.', 'bg-orange-600'); return; }
-      setPreview(res);
+      // File errors (strict CSV grammar) come with zero data rows: show them, don't hide them.
+      if (res.totalDataRows === 0 && res.errors.length === 0) { ui.toast('No data rows found in that file.', 'bg-orange-600'); return; }
+      setPreview({ gen, res });
     } catch {
+      if (gen !== selection.current) return;
       ui.toast('Could not read that file.', 'bg-orange-600');
     }
   };
 
+  const current = preview && preview.gen === selection.current ? preview.res : null;
+  const importable = !!current && current.rows.length > 0 && current.errors.length === 0;
+
   const confirm = () => {
-    if (!preview || preview.rows.length === 0) return;
+    // S2 all-or-nothing: any error anywhere in the file blocks the import; and only
+    // the preview of the latest selection may be imported.
+    if (!importable || !current) return;
+    const preview = current;
     onImported(preview.rows);
     ui.toast(`Imported ${preview.rows.length} row${preview.rows.length === 1 ? '' : 's'} (${preview.created} new, ${preview.updated} updated)`, 'bg-green-700');
-    setPreview(null);
+    closePreview();
   };
 
   return (
@@ -61,14 +81,14 @@ export function ImportExport<T extends { id: string }>({ spec, exportSource, exi
       )}
       {canExport && <button onClick={() => exportRows(spec, exportSource)} className={btn}>Export CSV</button>}
 
-      {preview && (
-        <Modal open onClose={() => setPreview(null)} title={`Import ${spec.entity}s`} subtitle="Review before anything is saved" maxWidth="max-w-lg">
+      {current && (
+        <Modal open onClose={closePreview} title={`Import ${spec.entity}s`} subtitle="Review before anything is saved" maxWidth="max-w-lg">
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-3 gap-3 text-center">
               {[
-                { l: 'New', v: preview.created, t: 'low' },
-                { l: 'Updated', v: preview.updated, t: 'info' },
-                { l: 'Skipped (errors)', v: preview.skipped, t: preview.skipped ? 'crit' : 'mut' },
+                { l: 'New', v: current.created, t: 'low' },
+                { l: 'Updated', v: current.updated, t: 'info' },
+                { l: 'Skipped (errors)', v: current.skipped, t: current.skipped ? 'crit' : 'mut' },
               ].map((s) => (
                 <div key={s.l} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
                   <div className="text-xl font-bold tabular-nums" style={{ color: `var(--${s.t})` }}>{s.v}</div>
@@ -77,35 +97,35 @@ export function ImportExport<T extends { id: string }>({ spec, exportSource, exi
               ))}
             </div>
 
-            {preview.errors.length > 0 && (
+            {current.errors.length > 0 && (
               <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                 <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider" style={{ background: 'var(--crit-bg)', color: 'var(--crit)' }}>
-                  {preview.errors.length} validation error{preview.errors.length === 1 ? '' : 's'} — those rows will be skipped
+                  {current.errors.length} validation error{current.errors.length === 1 ? '' : 's'} — nothing is imported until they are fixed
                 </div>
                 <ul className="max-h-40 overflow-y-auto divide-y text-[12px]" style={{ borderColor: 'var(--border)' }}>
-                  {preview.errors.slice(0, 12).map((e, i) => (
+                  {current.errors.slice(0, 12).map((e, i) => (
                     <li key={i} className="px-3 py-1.5" style={{ color: 'var(--text2)' }}>
                       Row {e.row} · <b>{e.field}</b>: {e.message}
                     </li>
                   ))}
-                  {preview.errors.length > 12 && <li className="px-3 py-1.5" style={{ color: 'var(--text3)' }}>…and {preview.errors.length - 12} more</li>}
+                  {current.errors.length > 12 && <li className="px-3 py-1.5" style={{ color: 'var(--text3)' }}>…and {current.errors.length - 12} more</li>}
                 </ul>
               </div>
             )}
 
             <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
-              Rows with a matching ID update the existing record (blank cells keep current values); rows without an ID are created.
+              Import creates new records only; IDs are assigned automatically, so leave the ID column blank. Edit existing records in their forms.
               Working from Excel? Use <b>Save As → CSV UTF-8</b> first.
             </p>
 
             <div className="flex justify-end gap-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-              <button onClick={() => setPreview(null)} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
+              <button onClick={closePreview} className="btn-neutral px-4 py-2 border rounded text-sm">Cancel</button>
               <button
                 onClick={confirm}
-                disabled={preview.rows.length === 0}
+                disabled={!importable}
                 className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
               >
-                Import {preview.rows.length} row{preview.rows.length === 1 ? '' : 's'}
+                Import {current.rows.length} row{current.rows.length === 1 ? '' : 's'}
               </button>
             </div>
           </div>

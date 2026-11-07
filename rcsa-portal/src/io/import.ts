@@ -18,13 +18,18 @@ import {
   THREAT_CATALOGUE,
 } from '../domain/constants';
 import { today } from '../domain/scoring';
-import { createIdAllocator, idAllocationMessage } from '../data/ids';
+import { idAllocationMessage } from '../data/ids';
+import { buildParentIndex, createVariantSafeAllocator, parseReferenceCell, showId, type ParentIndex, type ReferenceLabels } from '../data/importIds';
 
 // ── Spreadsheet import (.csv) ───────────────────────────────────────────────────
-// Parses a CSV file into validated Asset[] / Risk[]. No third-party parser (the
-// previous `xlsx` dependency was dropped — it carried known CVEs). Pure aside from
-// file I/O: no store/repo access — the caller commits the result. Round-trips with
-// the CSV export (computed columns like Value/Criticality/Score are ignored).
+// Parses a CSV file into validated Asset[] / Risk[] / Treatment[]. No third-party
+// parser (the previous `xlsx` dependency was dropped — it carried known CVEs). Pure
+// aside from file I/O: no store/repo access — the caller commits the result.
+//
+// ID integrity S2 (docs/ID_INTEGRITY_S2_DESIGN.md): CSV import is CREATE-ONLY.
+// Every record gets a new ID from the shared allocator; a non-blank value in any
+// ID column blocks the file. References to parents are exact and fail closed.
+// Any error anywhere blocks the import (the UI enables Import only with zero errors).
 
 export interface RowError {
   row: number; // 1-based spreadsheet row (matches what the user sees, header = row 1)
@@ -33,11 +38,11 @@ export interface RowError {
 }
 
 export interface ImportResult<T> {
-  rows: T[]; // valid, fully-typed entities ready to upsert
-  created: number; // rows with a new id
-  updated: number; // rows whose id matches an existing entity
+  rows: T[]; // valid NEW entities (preview); committed only when errors is empty
+  created: number; // rows that will be created
+  updated: number; // always 0: CSV import is create-only (kept for type compatibility)
   errors: RowError[];
-  skipped: number; // rows dropped due to errors
+  skipped: number; // rows with errors
   totalDataRows: number;
 }
 
@@ -46,61 +51,175 @@ type Raw = Record<string, unknown>;
 // Normalize a header/key for case- and space-insensitive lookup.
 const norm = (s: string): string => s.toLowerCase().replace(/[\s_]+/g, ' ').trim();
 
-/**
- * Minimal RFC-4180 CSV parser: handles quoted fields, escaped quotes (""),
- * and commas / newlines inside quotes. Returns rows of string cells.
- */
-function parseCsvCells(text: string): string[][] {
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // strip BOM
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
+// ── Strict CSV grammar (ID integrity S2 §3.2; identical in io/import.ts and lib/tableIo.ts) ─
+// RFC-4180 with fail-closed rules: a quote may only open a field (after optional
+// spaces/tabs); "" is a literal quote; after a closing quote only spaces/tabs and
+// then , / LF / CRLF / end of file may follow; an unclosed quote, a quote inside
+// an unquoted value and a bare CR are FILE errors — no cell is silently altered.
+// Quoted fields keep commas, LF and CR literally. The BOM is stripped.
+type CsvParse =
+  | { ok: true; rows: string[][] }
+  | { ok: false; row: number; message: string };
 
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
-      } else {
-        field += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      row.push(field);
-      field = '';
-    } else if (ch === '\n') {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-    } else if (ch !== '\r') {
-      field += ch;
-    }
-  }
-  if (field !== '' || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
+function showCell(value: string): string {
+  const s = value.replace(/\t/g, '\\t').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+  return s.length > 40 ? `${s.slice(0, 37)}…` : s;
 }
 
-/** Read a CSV file into header-keyed row objects (first row = headers). */
-async function readRows(file: File): Promise<Raw[]> {
-  const cells = parseCsvCells(await file.text());
-  if (cells.length === 0) return [];
+function parseCsvStrict(input: string): CsvParse {
+  const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
+  const rows: string[][] = [];
+  const n = text.length;
+  if (n === 0) return { ok: true, rows };
+  let row: string[] = [];
+  let record = 1; // CSV record number = spreadsheet row (header = 1)
+  let i = 0;
+  const fail = (rowNo: number, message: string): CsvParse => ({ ok: false, row: rowNo, message });
+  const bareCr = (rowNo: number): CsvParse =>
+    fail(rowNo, `Row ${rowNo}: the file contains a carriage return outside quotes. Save it again as CSV UTF-8.`);
+
+  for (;;) {
+    const column = row.length + 1;
+    // Field start: optional spaces/tabs before an opening quote are tolerated.
+    let j = i;
+    while (j < n && (text[j] === ' ' || text[j] === '\t')) j++;
+    let value = '';
+    if (j < n && text[j] === '"') {
+      const startRecord = record;
+      j++;
+      for (;;) {
+        if (j >= n) return fail(startRecord, `Row ${startRecord}, column ${column}: unclosed quote. Quote the whole value and double any quote inside it.`);
+        const ch = text[j];
+        if (ch === '"') {
+          if (text[j + 1] === '"') { value += '"'; j += 2; continue; }
+          j++;
+          break;
+        }
+        value += ch;
+        j++;
+      }
+      while (j < n && (text[j] === ' ' || text[j] === '\t')) j++;
+      if (j < n && text[j] === '\r' && text[j + 1] !== '\n') return bareCr(record);
+      if (j < n && text[j] !== ',' && text[j] !== '\n' && text[j] !== '\r') {
+        return fail(record, `Row ${record}, column ${column}: characters after a closing quote ("${showCell(value)}"). Quote the whole value and double any quote inside it.`);
+      }
+    } else {
+      j = i;
+      while (j < n && text[j] !== ',' && text[j] !== '\n' && text[j] !== '\r') {
+        if (text[j] === '"') {
+          let end = j;
+          while (end < n && text[end] !== ',' && text[end] !== '\n' && text[end] !== '\r') end++;
+          return fail(record, `Row ${record}, column ${column}: a quote character inside an unquoted value (${showCell(text.slice(i, end))}). Quote the whole value and double the inner quotes.`);
+        }
+        j++;
+      }
+      value = text.slice(i, j);
+      if (j < n && text[j] === '\r' && text[j + 1] !== '\n') return bareCr(record);
+    }
+    row.push(value);
+    if (j >= n) { rows.push(row); break; }
+    if (text[j] === ',') { i = j + 1; continue; }
+    // End of record: LF or CRLF.
+    i = text[j] === '\r' ? j + 2 : j + 1;
+    rows.push(row);
+    row = [];
+    record += 1;
+    if (i >= n) break;
+  }
+  return { ok: true, rows };
+}
+
+interface SheetLine {
+  raw: Raw; // header-keyed object — NON-identity columns only (via field())
+  cells: string[]; // the raw, untrimmed cells — identity columns are read from these
+}
+type Sheet = { ok: true; headers: string[]; lines: SheetLine[] } | { ok: false; error: RowError };
+
+/** Read a CSV file: strict parse, header row, non-blank data lines. */
+async function readSheet(file: File): Promise<Sheet> {
+  const parsed = parseCsvStrict(await file.text());
+  if (!parsed.ok) return { ok: false, error: { row: parsed.row, field: 'File', message: parsed.message } };
+  const cells = parsed.rows;
+  if (cells.length === 0) return { ok: true, headers: [], lines: [] };
   const headers = cells[0].map((h) => h.trim());
-  const out: Raw[] = [];
+  const lines: SheetLine[] = [];
   for (let r = 1; r < cells.length; r++) {
     const line = cells[r];
     if (line.every((c) => c.trim() === '')) continue; // skip blank lines
     const obj: Raw = {};
     headers.forEach((h, idx) => { obj[h] = line[idx] ?? ''; });
-    out.push(obj);
+    lines.push({ raw: obj, cells: line });
+  }
+  return { ok: true, headers, lines };
+}
+
+function fileErrorResult<T>(error: RowError): ImportResult<T> {
+  return { rows: [], created: 0, updated: 0, errors: [error], skipped: 0, totalDataRows: 0 };
+}
+
+/** Indices of EVERY header matching one of the aliases (duplicates included). */
+function columnsMatching(headers: string[], aliases: string[]): number[] {
+  const names = aliases.map(norm);
+  const out: number[] = [];
+  headers.forEach((h, idx) => { if (names.includes(norm(h))) out.push(idx); });
+  return out;
+}
+
+/** §3.1 rule 2: at most one reference column; otherwise a file error. */
+function singleReferenceColumn(headers: string[], aliases: string[], parent: string): { col: number | null; error?: RowError } {
+  const cols = columnsMatching(headers, aliases);
+  if (cols.length <= 1) return { col: cols[0] ?? null };
+  const list = cols.map((c) => `"${headers[c]}" in column ${c + 1}`).join(', ');
+  return {
+    col: null,
+    error: { row: 1, field: 'File', message: `The file has more than one ${parent}-reference column (${list}). Keep exactly one.` },
+  };
+}
+
+/**
+ * §3.1 rules 1 and 4, on the raw cells: a non-blank value in ANY row-ID column
+ * (duplicates and aliases included) blocks the row; so does a non-blank cell
+ * that has no heading (often an unquoted comma).
+ */
+function identityCellErrors(cells: string[], headers: string[], idCols: number[], rowNum: number): RowError[] {
+  const out: RowError[] = [];
+  cells.forEach((c, k) => {
+    if (c.trim() !== '' && (k >= headers.length || headers[k] === '')) {
+      out.push({
+        row: rowNum,
+        field: `Column ${k + 1}`,
+        message: `Row ${rowNum} has a value in column ${k + 1}, which has no heading. This is often an unquoted comma; put the cell in quotes.`,
+      });
+    }
+  });
+  for (const k of idCols) {
+    const v = cells[k] ?? '';
+    if (v.trim() !== '') {
+      out.push({
+        row: rowNum,
+        field: headers[k],
+        message:
+          `CSV import creates new records only, and IDs are assigned automatically. This file has a value in the ${headers[k]} column ("${showId(v.trim())}"). ` +
+          'If it is an export, importing it would create duplicates. Clear the ID column to import the rows as new records, or edit existing records in their forms.',
+      });
+    }
   }
   return out;
+}
+
+/** Resolve one reference cell (raw, untrimmed) against the parent index. */
+function resolveReferences(
+  cells: string[],
+  refCol: number | null,
+  index: ParentIndex,
+  labels: ReferenceLabels,
+  bad: (field: string, message: string) => void,
+): string[] {
+  const rawCell = refCol === null ? '' : (cells[refCol] ?? '');
+  const { ids, problems } = parseReferenceCell(rawCell, index, labels);
+  problems.forEach((p) => bad(labels.column, p));
+  if (ids.length === 0 && problems.length === 0) bad(labels.column, `At least one ${labels.column} is required`);
+  return ids;
 }
 
 /** Build a normalized-key accessor for one row, tolerant of header aliases. */
@@ -152,54 +271,43 @@ function parseList(value: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Batch id allocation through the shared safe allocator (data/ids.ts), built
- * ONCE per import and updated incrementally, honouring ids already taken
- * (existing + this batch). Only rows that passed validation reserve or
- * allocate ids. If allocation fails (numbering limit), the row gets an error
- * and is skipped.
- */
-function makeIdAllocator(prefix: string, used: Set<string>, field: string) {
-  const allocator = createIdAllocator(prefix, used, 3);
-  return {
-    next(bad: (field: string, message: string) => void): string {
-      try {
-        const id = allocator.next();
-        used.add(id);
-        return id;
-      } catch (err) {
-        bad(field, idAllocationMessage(err));
-        return '';
-      }
-    },
-    reserve(id: string): void {
-      used.add(id);
-      allocator.reserve(id);
-    },
-  };
+
+/** §3.4: new IDs from the shared allocator; an allocation failure is a row error. */
+function allocateFor(
+  allocator: { next(): string },
+  bad: (field: string, message: string) => void,
+  field: string,
+): string {
+  try {
+    return allocator.next();
+  } catch (err) {
+    bad(field, idAllocationMessage(err));
+    return '';
+  }
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────────
 
+const ASSET_ID_ALIASES = ['Asset ID', 'ID'];
+
 export async function parseAssetsFile(file: File, existing: Asset[]): Promise<ImportResult<Asset>> {
-  const raws = await readRows(file);
+  const sheet = await readSheet(file);
+  if (!sheet.ok) return fileErrorResult(sheet.error);
+  const { headers, lines } = sheet;
   const errors: RowError[] = [];
   const rows: Asset[] = [];
-  let created = 0;
-  let updated = 0;
   let skipped = 0;
   let totalDataRows = 0;
 
-  const byId = new Map(existing.map((a) => [a.id.toUpperCase(), a]));
-  const usedIds = new Set(existing.map((a) => a.id));
-  const ids = makeIdAllocator('AST', usedIds, 'Asset ID');
+  const idCols = columnsMatching(headers, ASSET_ID_ALIASES);
+  const ids = createVariantSafeAllocator('AST', existing.map((a) => a.id), 3);
 
-  raws.forEach((raw, i) => {
-    if (isRowEmpty(raw)) return;
-    totalDataRows += 1;
+  lines.forEach(({ raw, cells }, i) => {
     const rowNum = i + 2; // +1 header, +1 to 1-base
+    const rowErrors: RowError[] = identityCellErrors(cells, headers, idCols, rowNum);
+    if (rowErrors.length === 0 && isRowEmpty(raw)) return;
+    totalDataRows += 1;
     const get = field(raw);
-    const rowErrors: RowError[] = [];
     const bad = (f: string, m: string) => rowErrors.push({ row: rowNum, field: f, message: m });
 
     const name = get('Name', 'Asset Name');
@@ -230,38 +338,19 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
     const dataClass = enumOr<DataClass>('Data Class', get('Data Class'), DATA_CLASSES, 'Internal');
     const status = enumOr<AssetStatus>('Status', get('Status'), ASSET_STATUSES, 'Draft');
 
-    // Resolve id: explicit id updates the matching asset; otherwise allocate.
-    // Rows that already failed validation reserve / allocate no id.
+    // Rows that already failed validation allocate no id.
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
-    const givenId = get('Asset ID', 'ID');
-    let id: string;
-    let isUpdate = false;
-    if (givenId) {
-      const match = byId.get(givenId.toUpperCase());
-      if (match) {
-        id = match.id;
-        isUpdate = true;
-      } else if (usedIds.has(givenId)) {
-        id = ids.next(bad); // collides with a row already taken this batch
-      } else {
-        id = givenId;
-        ids.reserve(givenId);
-      }
-    } else {
-      id = ids.next(bad);
-    }
-
+    const id = allocateFor(ids, bad, 'Asset ID');
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
 
-    const prev = isUpdate ? byId.get(givenId.toUpperCase()) : undefined;
     rows.push({
       id,
       name,
@@ -283,59 +372,48 @@ export async function parseAssetsFile(file: File, existing: Asset[]): Promise<Im
       reviewDate: get('Review Date'),
       evidence: parseList(get('Evidence')),
       notes: get('Notes'),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
+      submittedAt: get('Submitted At') || today(),
     });
-    if (isUpdate) updated += 1;
-    else created += 1;
   });
 
-  return { rows, created, updated, errors, skipped, totalDataRows };
+  return { rows, created: rows.length, updated: 0, errors, skipped, totalDataRows };
 }
 
 // ── Risks ──────────────────────────────────────────────────────────────────────
+
+const RISK_ID_ALIASES = ['Risk ID', 'ID'];
+const RISK_ASSET_REF_ALIASES = ['Asset ID'];
 
 export async function parseRisksFile(
   file: File,
   existingRisks: Risk[],
   assets: Asset[],
 ): Promise<ImportResult<Risk>> {
-  const raws = await readRows(file);
+  const sheet = await readSheet(file);
+  if (!sheet.ok) return fileErrorResult(sheet.error);
+  const { headers, lines } = sheet;
+  const ref = singleReferenceColumn(headers, RISK_ASSET_REF_ALIASES, 'asset');
+  if (ref.error) return fileErrorResult(ref.error);
   const errors: RowError[] = [];
   const rows: Risk[] = [];
-  let created = 0;
-  let updated = 0;
   let skipped = 0;
   let totalDataRows = 0;
 
-  const riskById = new Map(existingRisks.map((r) => [r.id.toUpperCase(), r]));
-  const assetIds = new Set(assets.map((a) => a.id.toUpperCase()));
-  const usedIds = new Set(existingRisks.map((r) => r.id));
-  const ids = makeIdAllocator('RSK', usedIds, 'Risk ID');
+  const idCols = columnsMatching(headers, RISK_ID_ALIASES);
+  const assetIndex = buildParentIndex(assets.map((a) => a.id));
+  const ids = createVariantSafeAllocator('RSK', existingRisks.map((r) => r.id), 3);
 
-  raws.forEach((raw, i) => {
-    if (isRowEmpty(raw)) return;
-    totalDataRows += 1;
+  lines.forEach(({ raw, cells }, i) => {
     const rowNum = i + 2;
+    const rowErrors: RowError[] = identityCellErrors(cells, headers, idCols, rowNum);
+    if (rowErrors.length === 0 && isRowEmpty(raw)) return;
+    totalDataRows += 1;
     const get = field(raw);
-    const rowErrors: RowError[] = [];
     const bad = (f: string, m: string) => rowErrors.push({ row: rowNum, field: f, message: m });
 
-    // One risk may apply to several assets — accept a list in the cell, separated
-    // by ; , or newlines. Every referenced asset must already exist.
-    const assetIdRaw = get('Asset ID');
-    const requestedAssetIds = assetIdRaw.split(/[;,\n]/).map((s) => s.trim()).filter(Boolean);
-    if (requestedAssetIds.length === 0) {
-      bad('Asset ID', 'At least one Asset ID is required');
-    }
-    const resolvedAssetIds: string[] = [];
-    requestedAssetIds.forEach((raw) => {
-      if (!assetIds.has(raw.toUpperCase())) {
-        bad('Asset ID', `No asset "${raw}" exists — import the asset first`);
-        return;
-      }
-      const canon = assets.find((a) => a.id.toUpperCase() === raw.toUpperCase())!.id;
-      if (!resolvedAssetIds.includes(canon)) resolvedAssetIds.push(canon);
-    });
+    // One risk may apply to several assets: a list in ONE reference cell,
+    // separated by ; , or newlines. Every asset must exist exactly (§3.3).
+    const resolvedAssetIds = resolveReferences(cells, ref.col, assetIndex, { parent: 'asset', column: 'Asset ID' }, bad);
 
     const threat = get('Threat');
     if (!threat) bad('Threat', 'Threat is required');
@@ -357,37 +435,19 @@ export async function parseRisksFile(
       (matchEnum<Assessment>(get('Decision', 'Assessment'), ASSESSMENTS) as Assessment | null) ??
       (get('Decision', 'Assessment') ? (bad('Decision', `must be: ${ASSESSMENTS.join(', ')}`), 'Mitigate') : 'Mitigate');
 
-    // Rows that already failed validation reserve / allocate no id.
+    // Rows that already failed validation allocate no id.
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
-    const givenId = get('Risk ID', 'ID');
-    let id: string;
-    let isUpdate = false;
-    if (givenId) {
-      const match = riskById.get(givenId.toUpperCase());
-      if (match) {
-        id = match.id;
-        isUpdate = true;
-      } else if (usedIds.has(givenId)) {
-        id = ids.next(bad);
-      } else {
-        id = givenId;
-        ids.reserve(givenId);
-      }
-    } else {
-      id = ids.next(bad);
-    }
-
+    const id = allocateFor(ids, bad, 'Risk ID');
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
 
-    const prev = isUpdate ? riskById.get(givenId.toUpperCase()) : undefined;
     rows.push({
       id,
       assetIds: resolvedAssetIds,
@@ -404,95 +464,68 @@ export async function parseRisksFile(
       acceptanceExpiry: get('Acceptance Expiry'),
       evidence: parseList(get('Evidence')),
       comments: parseList(get('Comments')),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
+      submittedAt: get('Submitted At') || today(),
     });
-    if (isUpdate) updated += 1;
-    else created += 1;
   });
 
-  return { rows, created, updated, errors, skipped, totalDataRows };
+  return { rows, created: rows.length, updated: 0, errors, skipped, totalDataRows };
 }
 
 // ── Treatments ───────────────────────────────────────────────────────────────
+
+const TREATMENT_ID_ALIASES = ['Treatment ID', 'ID'];
+const TREATMENT_RISK_REF_ALIASES = ['Risk ID', 'Risk IDs'];
 
 export async function parseTreatmentsFile(
   file: File,
   existingTreatments: Treatment[],
   risks: Risk[],
 ): Promise<ImportResult<Treatment>> {
-  const raws = await readRows(file);
+  const sheet = await readSheet(file);
+  if (!sheet.ok) return fileErrorResult(sheet.error);
+  const { headers, lines } = sheet;
+  const ref = singleReferenceColumn(headers, TREATMENT_RISK_REF_ALIASES, 'risk');
+  if (ref.error) return fileErrorResult(ref.error);
   const errors: RowError[] = [];
   const rows: Treatment[] = [];
-  let created = 0;
-  let updated = 0;
   let skipped = 0;
   let totalDataRows = 0;
 
-  const byId = new Map(existingTreatments.map((t) => [t.id.toUpperCase(), t]));
-  const riskIdSet = new Set(risks.map((r) => r.id.toUpperCase()));
-  const usedIds = new Set(existingTreatments.map((t) => t.id));
-  const ids = makeIdAllocator('TRT', usedIds, 'Treatment ID');
+  const idCols = columnsMatching(headers, TREATMENT_ID_ALIASES);
+  const riskIndex = buildParentIndex(risks.map((r) => r.id));
+  const ids = createVariantSafeAllocator('TRT', existingTreatments.map((t) => t.id), 3);
 
-  raws.forEach((raw, i) => {
-    if (isRowEmpty(raw)) return;
-    totalDataRows += 1;
+  lines.forEach(({ raw, cells }, i) => {
     const rowNum = i + 2;
+    const rowErrors: RowError[] = identityCellErrors(cells, headers, idCols, rowNum);
+    if (rowErrors.length === 0 && isRowEmpty(raw)) return;
+    totalDataRows += 1;
     const get = field(raw);
-    const rowErrors: RowError[] = [];
     const bad = (f: string, m: string) => rowErrors.push({ row: rowNum, field: f, message: m });
 
     const title = get('Title');
     if (!title) bad('Title', 'Title is required');
 
-    // One treatment can address several risks (separated by ; , or newlines).
-    const riskRaw = get('Risk ID', 'Risk IDs');
-    const requested = riskRaw.split(/[;,\n]/).map((s) => s.trim()).filter(Boolean);
-    if (requested.length === 0) bad('Risk ID', 'At least one Risk ID is required');
-    const resolved: string[] = [];
-    requested.forEach((rr) => {
-      if (!riskIdSet.has(rr.toUpperCase())) {
-        bad('Risk ID', `No risk "${rr}" exists — import the risk first`);
-        return;
-      }
-      const canon = risks.find((r) => r.id.toUpperCase() === rr.toUpperCase())!.id;
-      if (!resolved.includes(canon)) resolved.push(canon);
-    });
+    // One treatment can address several risks: a list in ONE reference cell (§3.3).
+    const resolved = resolveReferences(cells, ref.col, riskIndex, { parent: 'risk', column: 'Risk ID' }, bad);
 
     const status =
       (matchEnum<TreatmentStatus>(get('Status'), TREATMENT_STATUSES) as TreatmentStatus | null) ??
       (get('Status') ? (bad('Status', `must be: ${TREATMENT_STATUSES.join(', ')}`), 'Open') : 'Open');
 
-    // Rows that already failed validation reserve / allocate no id.
+    // Rows that already failed validation allocate no id.
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
-    const givenId = get('Treatment ID', 'ID');
-    let id: string;
-    let isUpdate = false;
-    if (givenId) {
-      const match = byId.get(givenId.toUpperCase());
-      if (match) {
-        id = match.id;
-        isUpdate = true;
-      } else if (usedIds.has(givenId)) {
-        id = ids.next(bad);
-      } else {
-        id = givenId;
-        ids.reserve(givenId);
-      }
-    } else {
-      id = ids.next(bad);
-    }
-
+    const id = allocateFor(ids, bad, 'Treatment ID');
     if (rowErrors.length) {
       errors.push(...rowErrors);
       skipped += 1;
       return;
     }
 
-    const prev = isUpdate ? byId.get(givenId.toUpperCase()) : undefined;
     rows.push({
       id,
       riskIds: resolved,
@@ -503,11 +536,9 @@ export async function parseTreatmentsFile(
       status,
       evidence: parseList(get('Evidence')),
       comments: parseList(get('Comments')),
-      submittedAt: get('Submitted At') || prev?.submittedAt || today(),
+      submittedAt: get('Submitted At') || today(),
     });
-    if (isUpdate) updated += 1;
-    else created += 1;
   });
 
-  return { rows, created, updated, errors, skipped, totalDataRows };
+  return { rows, created: rows.length, updated: 0, errors, skipped, totalDataRows };
 }

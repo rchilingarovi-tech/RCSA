@@ -19,14 +19,28 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   const [riskResult, setRiskResult] = useState<ImportResult<Risk> | null>(null);
   const [treatmentResult, setTreatmentResult] = useState<ImportResult<Treatment> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // S2 stale-preview guard: every selection (and reset / tab switch) starts a new
+  // generation. A read that completes for an older generation is ignored, and only
+  // a preview produced by the CURRENT generation can be imported.
+  const selection = useRef(0);
+  const [previewGen, setPreviewGen] = useState<number | null>(null);
 
   const result = tab === 'assets' ? assetResult : tab === 'risks' ? riskResult : treatmentResult;
+  const importable =
+    !!result && !busy && !committing && previewGen === selection.current && result.rows.length > 0 && result.errors.length === 0;
 
-  const reset = () => {
-    setFileName('');
+  const clearPreview = () => {
     setAssetResult(null);
     setRiskResult(null);
     setTreatmentResult(null);
+    setPreviewGen(null);
+  };
+
+  const reset = () => {
+    selection.current += 1; // invalidates any read still in flight
+    setFileName('');
+    clearPreview();
+    setBusy(false);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -37,27 +51,42 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   };
 
   const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    setFileName(file.name);
+    const gen = ++selection.current;
+    clearPreview(); // the previous preview is invalid from this moment
+    setFileName(file?.name ?? '');
+    if (!file) {
+      setBusy(false); // selection cleared: nothing to read, nothing importable
+      return;
+    }
     setBusy(true);
     try {
       if (tab === 'assets') {
-        setAssetResult(await parseAssetsFile(file, store.assets));
+        const res = await parseAssetsFile(file, store.assets);
+        if (gen !== selection.current) return;
+        setAssetResult(res);
       } else if (tab === 'risks') {
-        setRiskResult(await parseRisksFile(file, store.risks, store.assets));
+        const res = await parseRisksFile(file, store.risks, store.assets);
+        if (gen !== selection.current) return;
+        setRiskResult(res);
       } else {
-        setTreatmentResult(await parseTreatmentsFile(file, store.treatments, store.risks));
+        const res = await parseTreatmentsFile(file, store.treatments, store.risks);
+        if (gen !== selection.current) return;
+        setTreatmentResult(res);
       }
+      setPreviewGen(gen);
     } catch (e) {
+      if (gen !== selection.current) return;
       ui.toast(`Could not read file: ${(e as Error).message}`, 'bg-red-700');
       reset();
     } finally {
-      setBusy(false);
+      if (gen === selection.current) setBusy(false);
     }
   };
 
   const commit = async () => {
-    if (!result || result.rows.length === 0) return;
+    // S2 all-or-nothing: any error anywhere in the file blocks the import; and only
+    // the preview of the latest, fully read selection may be imported.
+    if (!importable || !result) return;
     setCommitting(true);
     try {
       if (tab === 'assets') await store.importAssets(assetResult!.rows);
@@ -95,7 +124,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       title="Import from CSV"
-      subtitle="Upload a pre-drafted .csv (download the template below). Existing IDs are updated; blank IDs are added."
+      subtitle="Upload a pre-drafted .csv (download the template below). Import creates new records only; IDs are assigned automatically, so leave the ID column blank."
       maxWidth="max-w-3xl"
       headerExtra={
         <div className="px-6 pt-3 border-b flex gap-2">
@@ -147,7 +176,6 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="px-2.5 py-1 rounded bg-gray-100 text-gray-700">{result.totalDataRows} rows read</span>
               <span className="px-2.5 py-1 rounded bg-green-100 text-green-800">{result.created} new</span>
-              <span className="px-2.5 py-1 rounded bg-blue-100 text-blue-800">{result.updated} to update</span>
               {result.skipped > 0 && (
                 <span className="px-2.5 py-1 rounded bg-red-100 text-red-800">{result.skipped} skipped</span>
               )}
@@ -179,8 +207,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             {result.rows.length === 0 && result.errors.length === 0 && (
               <p className="text-sm text-gray-500">No data rows found in the file.</p>
             )}
-            {result.skipped > 0 && result.rows.length > 0 && (
-              <p className="text-xs text-gray-500">Rows with problems are skipped; the valid rows can still be imported.</p>
+            {result.errors.length > 0 && (
+              <p className="text-xs text-gray-500">Nothing is imported while the file has any error. Fix the problems above and choose the file again.</p>
             )}
           </div>
         )}
@@ -192,7 +220,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={() => void commit()}
-            disabled={!result || result.rows.length === 0 || committing}
+            disabled={!importable}
             className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {committing ? 'Importing…' : result ? `Import ${result.rows.length} ${tab}` : 'Import'}
