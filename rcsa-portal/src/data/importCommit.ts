@@ -14,9 +14,14 @@
 // verified or uncertain. There is NO retry and NO rollback: either could
 // duplicate records or overwrite a concurrent change.
 //
-// Step 2 scope: not yet wired into repositories or the UI, and no audit — the
-// audit pre-flight and the checked audit write arrive with Step 3.
+// Step 3 adds `importNewRecords` (end of this file): the audit pre-flight
+// (decision D5-1), the checked audit write and the five §4.5 outcomes. It is
+// reached through the repositories' dedicated `importNew` methods only.
 import { buildParentIndex, checkResolvedReference, collisionKey, showId, type ReferenceLabels } from './importIds';
+import { auditLog, type AuditInput } from '../audit/auditLog';
+
+/** localStorage key of the audit log (audit/auditLog.ts). */
+export const AUDIT_KEY = 'infosec.audit.v1';
 
 export interface ImportTarget {
   /** localStorage key of the collection being imported into, e.g. "rcsa.assets.v1". */
@@ -89,12 +94,13 @@ export function readForImport(key: string): ReadForImport {
   const r = rawGet(key);
   if (!r.ok) return { status: 'unavailable' };
   if (r.raw === null) return { status: 'missing' };
-  try {
-    const parsed: unknown = JSON.parse(r.raw);
-    return Array.isArray(parsed) ? { status: 'ok', records: parsed } : { status: 'unreadable' };
-  } catch {
-    return { status: 'unreadable' };
-  }
+  // Same validation as the commit's own Phase 1 (parseCollection): a JSON array
+  // whose every entry is a non-null object with a string id. Anything else —
+  // e.g. [null] or an entry without an id — is "unreadable", so callers keep
+  // their previous state instead of adopting malformed records (Codex S2
+  // step 3 review). Only validated records ever reach display adapters.
+  const parsed = parseCollection(r.raw);
+  return parsed.ok ? { status: 'ok', records: parsed.records } : { status: 'unreadable' };
 }
 
 /**
@@ -204,4 +210,91 @@ export function commitNewRecords<T extends { id: string }>(opts: {
     return { status: 'uncertain', reason: 'The stored data read back differs from what was written, so it is unknown whether the import was saved.' };
   }
   return { status: 'verified', written: rows.length, records: JSON.parse(next) as unknown[] };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Step 3 — audit pre-flight, checked audit write and the five outcomes (§4.4–§4.6)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The five §4.5 outcomes. Data and audit are two separate writes: an audit
+ * failure after a verified data write is reported, never rolled back, and never
+ * described as atomic. Nothing is retried.
+ */
+export type ImportOutcome =
+  /** Phase 1 finding (incl. the audit pre-flight) or data not written. Nothing changed. */
+  | { kind: 'rejected'; reasons: string[] }
+  /** Data verified and every audit event recorded. */
+  | { kind: 'committed'; count: number; records: unknown[] }
+  /** Data verified; the audit write provably did not happen. */
+  | { kind: 'committed-audit-not-recorded'; count: number; records: unknown[]; listenerErrors: number }
+  /** Data verified; the audit write may or may not have happened. */
+  | { kind: 'committed-audit-uncertain'; count: number; records: unknown[]; listenerErrors: number }
+  /** The data write may or may not have happened. No audit attempted. `refresh` is a read-only re-read. */
+  | { kind: 'uncertain'; reason: string; refresh: ReadForImport };
+
+/**
+ * D5-1 audit pre-flight (§4.2): refuse BEFORE any data write when the audit log
+ * cannot be read, or is present but not a JSON array — so an import is never
+ * knowingly left unaudited. A missing audit key is fine (an empty log).
+ */
+export function auditPreflight(): string | null {
+  const r = rawGet(AUDIT_KEY);
+  if (!r.ok) return UNAVAILABLE;
+  if (r.raw === null) return null;
+  try {
+    if (Array.isArray(JSON.parse(r.raw))) return null;
+  } catch {
+    /* fall through */
+  }
+  return 'The audit log is unreadable, so this import could not be recorded. Nothing was imported.';
+}
+
+/**
+ * The full create-only import: audit pre-flight → Phase 1 checks → one checked
+ * data write → (only if verified) one checked audit batch. Returns one of the
+ * five outcomes; `records` / `refresh` come from storage read-backs only.
+ */
+export function importNewRecords<T extends { id: string }>(opts: {
+  target: ImportTarget;
+  rows: T[];
+  parent?: ImportParent<T>;
+  /** The audit events for the written rows (same events as today's saves / bulkSave). */
+  auditEvents: (rows: T[]) => AuditInput[];
+}): ImportOutcome {
+  const preflight = auditPreflight();
+  if (preflight) return { kind: 'rejected', reasons: [preflight] };
+
+  const data = commitNewRecords({ target: opts.target, rows: opts.rows, parent: opts.parent });
+  if (data.status === 'rejected') return { kind: 'rejected', reasons: data.reasons };
+  if (data.status === 'uncertain') return { kind: 'uncertain', reason: data.reason, refresh: readForImport(opts.target.key) };
+
+  const audit = auditLog.recordBatchChecked(opts.auditEvents(opts.rows));
+  if (audit.status === 'recorded') return { kind: 'committed', count: data.written, records: data.records };
+  if (audit.status === 'not-recorded') {
+    return { kind: 'committed-audit-not-recorded', count: data.written, records: data.records, listenerErrors: audit.listenerErrors };
+  }
+  return { kind: 'committed-audit-uncertain', count: data.written, records: data.records, listenerErrors: audit.listenerErrors };
+}
+
+/**
+ * §4.5 user messages. `noun` is the plural display name ("assets"). For
+ * UNCERTAIN, a refresh that could not be read adds the §4.6 warning. No message
+ * tells the user to reload (a reload can seed or migrate, F23).
+ */
+export function outcomeMessage(outcome: ImportOutcome, noun: string): string {
+  switch (outcome.kind) {
+    case 'rejected':
+      return outcome.reasons.join(' ');
+    case 'committed':
+      return `Imported ${outcome.count} new ${noun}.`;
+    case 'committed-audit-not-recorded':
+      return `${outcome.count} new ${noun} were imported, but the audit log could not be updated. No audit events were recorded for this import.`;
+    case 'committed-audit-uncertain':
+      return `${outcome.count} new ${noun} were imported. The audit log may not have been updated; check the Audit Log.`;
+    case 'uncertain':
+      return outcome.refresh.status === 'ok'
+        ? 'The import may or may not have been saved. The list now shows what is stored; check it before importing again.'
+        : 'The import may or may not have been saved, and the stored data could not be read back. Reloading the app would replace missing data with demo data.';
+  }
 }

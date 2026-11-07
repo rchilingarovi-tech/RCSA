@@ -1,4 +1,12 @@
 import type { Asset, Risk, Treatment } from './models';
+import type { ImportOutcome, ReadForImport } from './importCommit';
+
+/** The RCSA collections a CSV import can create records in. */
+export interface RcsaImportCollections {
+  assets: Asset;
+  risks: Risk;
+  treatments: Treatment;
+}
 
 /**
  * Swappable persistence boundary. Components and the store talk only to this
@@ -24,4 +32,13 @@ export interface RcsaRepository {
   deleteTreatment(id: string): Promise<void>;
   /** Restore the original demo data set. */
   resetToSeed(): Promise<{ assets: Asset[]; risks: Risk[]; treatments: Treatment[] }>;
+  /**
+   * ID integrity S2 — CREATE-ONLY CSV import (import path only; saves are
+   * unchanged). Audit pre-flight, raw-storage checks (IDs still free, B-3 parent
+   * revalidation), one checked append-only write, one checked audit batch.
+   * Returns one of the five §4.5 outcomes; never seeds, migrates or retries.
+   */
+  importNew<K extends keyof RcsaImportCollections>(collection: K, rows: RcsaImportCollections[K][]): Promise<ImportOutcome>;
+  /** Read-only refresh source for one collection (raw read; risks shown via in-memory migrateRisk; no writes). */
+  readForImport<K extends keyof RcsaImportCollections>(collection: K): Promise<ReadForImport>;
 }

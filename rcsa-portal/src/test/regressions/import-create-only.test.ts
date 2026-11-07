@@ -6,8 +6,17 @@
 // (asserted for the UIs in import-commit-ui.test.tsx).
 // Step 2 (persistence core, data/importCommit.ts; design §4.1–§4.3, §9.1 T-S,
 // T-SE, T-L, T-P, T-W data part): see the sections at the end of this file.
+// Step 3 (audit pre-flight, checked audit, repository integration, store
+// refresh, the five outcomes; design §4.2, §4.4–§4.6, §9.1 T-A, T-W, T-R).
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { commitNewRecords, readForImport, type ImportParent } from '../../data/importCommit';
+import { createElement, useEffect } from 'react';
+import { act, render, waitFor } from '@testing-library/react';
+import { commitNewRecords, importNewRecords, outcomeMessage, readForImport, type ImportOutcome, type ImportParent } from '../../data/importCommit';
+import { auditLog, type AuditEvent } from '../../audit/auditLog';
+import { LocalStorageRepo } from '../../data/localStorageRepo';
+import { createLocalRepo } from '../../data/createLocalRepo';
+import { repo as appRepo } from '../../data';
+import { AppStoreProvider, useStore } from '../../state/AppStore';
 import type { Asset, Risk, Treatment } from '../../data/models';
 import { parseAssetsFile, parseRisksFile, parseTreatmentsFile, type ImportResult } from '../../io/import';
 import { exportRows, importCsvText, type ImportResult as TableResult, type IoSpec } from '../../lib/tableIo';
@@ -714,5 +723,324 @@ describe('Duplicate parent IDs: rejected at preview and at commit, both relation
     expect(preview.errors).toEqual([]);
     expect(commitNewRecords({ target: RISKS_TARGET, rows: preview.rows, parent: ASSET_PARENT }).status).toBe('verified');
     expect((JSON.parse(localStorage.getItem(RISKS_KEY)!) as Risk[]).map((r) => r.assetIds)).toEqual([['AST-001']]);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// S2 STEP 3 — audit pre-flight, checked audit, outcomes, repositories, store
+// ═════════════════════════════════════════════════════════════════════════════
+const AUDIT_KEY = 'infosec.audit.v1';
+const auditView = (events: AuditEvent[]) => events.map(({ id: _id, ts: _ts, ...rest }) => rest);
+const assetEvents = (rows: Asset[]) => rows.map((a) => ({ action: 'create' as const, entity: 'Asset', entityId: a.id, summary: `Created Asset ${a.id} — ${a.name}` }));
+const importAssets = (rows: Asset[]) => importNewRecords({ target: ASSETS_TARGET, rows, auditEvents: assetEvents });
+
+describe('Step 3: the five outcomes (T-A, T-W)', () => {
+  it('COMMITTED: data verified and the audit batch recorded; message as designed', () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    const outcome = importAssets([asset('AST-002'), asset('AST-003')]);
+    expect(outcome.kind).toBe('committed');
+    expect(outcome.kind === 'committed' && (outcome.records as Asset[]).map((a) => a.id)).toEqual(['AST-001', 'AST-002', 'AST-003']);
+    expect(auditLog.list().map((e) => e.entityId)).toEqual(['AST-003', 'AST-002']);
+    expect(outcomeMessage(outcome, 'assets')).toBe('Imported 2 new assets.');
+  });
+
+  it.each(['{}', '"x"', 'not json'])('audit pre-flight (D5-1): an unreadable audit log (%s) is REJECTED before any write', (raw) => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(AUDIT_KEY, raw);
+    const outcome = expectZeroWrites(() => importAssets([asset('AST-002')]));
+    expect(outcome).toEqual({ kind: 'rejected', reasons: ['The audit log is unreadable, so this import could not be recorded. Nothing was imported.'] });
+  });
+
+  it('audit pre-flight: storage unavailable is REJECTED without writing', () => {
+    store(ASSETS_KEY, []);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied'); });
+    expect(importAssets([asset('AST-001')])).toEqual({ kind: 'rejected', reasons: ['Browser storage is not available. Nothing was imported.'] });
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('a Phase 1 data finding is REJECTED and no audit event is written', () => {
+    store(ASSETS_KEY, [asset('AST-001'), asset('ast-002')]); // AST-002 taken as a variant
+    store(AUDIT_KEY, []);
+    const outcome = expectZeroWrites(() => importAssets([asset('AST-002')]));
+    expect(outcome.kind).toBe('rejected');
+  });
+
+  it('COMMITTED, AUDIT NOT RECORDED: data verified, the audit write failed with the log unchanged; nothing rolled back', () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(AUDIT_KEY, []);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === AUDIT_KEY) throw new DOMException('full', 'QuotaExceededError');
+      originalSetItem.call(this, k, v);
+    });
+    const outcome = importAssets([asset('AST-002')]);
+    expect(outcome.kind).toBe('committed-audit-not-recorded');
+    expect((JSON.parse(localStorage.getItem(ASSETS_KEY)!) as Asset[]).map((a) => a.id)).toEqual(['AST-001', 'AST-002']);
+    expect(localStorage.getItem(AUDIT_KEY)).toBe('[]');
+    expect(outcomeMessage(outcome, 'assets')).toBe('1 new assets were imported, but the audit log could not be updated. No audit events were recorded for this import.');
+  });
+
+  it('COMMITTED, AUDIT UNCERTAIN: data verified, the audit write threw after changing the log', () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      originalSetItem.call(this, k, v);
+      if (k === AUDIT_KEY) throw new Error('late');
+    });
+    const outcome = importAssets([asset('AST-002')]);
+    expect(outcome.kind).toBe('committed-audit-uncertain');
+    expect(outcomeMessage(outcome, 'assets')).toMatch(/may not have been updated; check the Audit Log/);
+  });
+
+  it('UNCERTAIN data write: no audit attempted, no retry; the refresh is a read-only re-read', () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      originalSetItem.call(this, k, v);
+      throw new Error('late data failure');
+    });
+    const outcome = importAssets([asset('AST-002')]);
+    expect(outcome.kind).toBe('uncertain');
+    expect(setItem.mock.calls.map(([k]) => k), 'one data write, no audit write, no retry').toEqual([ASSETS_KEY]);
+    expect(outcome.kind === 'uncertain' && outcome.refresh.status).toBe('ok');
+    expect(outcomeMessage(outcome, 'assets')).toBe('The import may or may not have been saved. The list now shows what is stored; check it before importing again.');
+    expect(outcomeMessage(outcome, 'assets')).not.toMatch(/reload the/i);
+  });
+
+  it('UNCERTAIN with an unreadable re-read reports it and warns about reloading', () => {
+    const outcome: ImportOutcome = { kind: 'uncertain', reason: 'x', refresh: { status: 'missing' } };
+    expect(outcomeMessage(outcome, 'assets')).toMatch(/could not be read back\. Reloading the app would replace missing data with demo data\./);
+  });
+
+  it('a throwing audit listener does not change a COMMITTED outcome', () => {
+    store(ASSETS_KEY, []);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const unsubscribe = auditLog.subscribe(() => { throw new Error('listener'); });
+    expect(importAssets([asset('AST-001')]).kind).toBe('committed');
+    unsubscribe();
+  });
+});
+
+describe('Step 3: LocalStorageRepo.importNew — repository integration (T-R)', () => {
+  it('writes only the target key and the audit key; never calls listAssets/listRisks/listTreatments', async () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(RISKS_KEY, []);
+    store(TREATMENTS_KEY, []);
+    const repo = new LocalStorageRepo();
+    const lists = [vi.spyOn(repo, 'listAssets'), vi.spyOn(repo, 'listRisks'), vi.spyOn(repo, 'listTreatments')];
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const outcome = await repo.importNew('risks', [risk('RSK-001')]);
+    expect(outcome.kind).toBe('committed');
+    expect(setItem.mock.calls.map(([k]) => k)).toEqual([RISKS_KEY, AUDIT_KEY]);
+    lists.forEach((s) => expect(s).not.toHaveBeenCalled());
+  });
+
+  it('audit events, text and order equal what saveX records for the same creates', async () => {
+    const rows = [asset('AST-001', { name: 'One' }), asset('AST-002', { name: 'Two' })];
+    store(ASSETS_KEY, []);
+    await new LocalStorageRepo().importNew('assets', rows);
+    const viaImport = auditView(auditLog.list());
+
+    localStorage.clear();
+    store(ASSETS_KEY, []);
+    const legacy = new LocalStorageRepo();
+    for (const a of rows) await legacy.saveAsset(a);
+    expect(viaImport).toEqual(auditView(auditLog.list()));
+    expect(viaImport.map((e) => e.summary)).toEqual(['Created Asset AST-002 — Two', 'Created Asset AST-001 — One']);
+  });
+
+  it('risk and treatment create events also match saveRisk / saveTreatment', async () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(RISKS_KEY, [risk('RSK-001')]);
+    store(TREATMENTS_KEY, []);
+    const repo = new LocalStorageRepo();
+    expect((await repo.importNew('risks', [risk('RSK-002')])).kind).toBe('committed');
+    expect((await repo.importNew('treatments', [treatment('TRT-001', ['RSK-001'])])).kind).toBe('committed');
+    const viaImport = auditView(auditLog.list());
+
+    localStorage.clear();
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(RISKS_KEY, [risk('RSK-001')]);
+    store(TREATMENTS_KEY, []);
+    await repo.saveRisk(risk('RSK-002'));
+    await repo.saveTreatment(treatment('TRT-001', ['RSK-001']));
+    expect(viaImport).toEqual(auditView(auditLog.list()));
+  });
+
+  it('legacy risks stay byte-identical in storage; the returned read-back is the in-memory migrateRisk view', async () => {
+    const raw = '[{"id":"RSK-001","assetId":"AST-001","actionPlan":"Keep","threat":"DDoS"}]';
+    store(RISKS_KEY, raw);
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(TREATMENTS_KEY, []);
+    const outcome = await new LocalStorageRepo().importNew('risks', [risk('RSK-002')]);
+    expect(outcome.kind).toBe('committed');
+    expect(localStorage.getItem(RISKS_KEY)!.startsWith(raw.slice(0, -1))).toBe(true);
+    const shown = outcome.kind === 'committed' ? (outcome.records as Risk[]) : [];
+    expect(shown[0]).toMatchObject({ id: 'RSK-001', assetIds: ['AST-001'] });
+    expect('actionPlan' in shown[0]).toBe(false); // display view only
+    expect(JSON.parse(localStorage.getItem(RISKS_KEY)!)[0].actionPlan).toBe('Keep'); // storage untouched
+  });
+
+  it('treatments import with no treatments key: REJECTED, no seed, no migration', async () => {
+    store(RISKS_KEY, [{ id: 'RSK-001', assetId: 'AST-001', actionPlan: 'Keep me' }]);
+    const repo = new LocalStorageRepo();
+    const outcome = await expectZeroWrites(() => repo.importNew('treatments', [treatment('TRT-001', ['RSK-001'])]));
+    expect(outcome).toEqual({ kind: 'rejected', reasons: ['Treatments are not initialised in this browser. Nothing was imported.'] });
+  });
+
+  it('readForImport is read-only (no seed for a missing key; risks via in-memory migrateRisk)', async () => {
+    const repo = new LocalStorageRepo();
+    expect(await expectZeroWrites(() => repo.readForImport('assets'))).toEqual({ status: 'missing' });
+    store(RISKS_KEY, [{ id: 'RSK-001', assetId: 'AST-001' }]);
+    const r = await expectZeroWrites(() => repo.readForImport('risks'));
+    expect(r.status === 'ok' && r.records).toEqual([{ id: 'RSK-001', assetIds: ['AST-001'] }]);
+  });
+});
+
+describe('Step 3: createLocalRepo.importNew — standalone modules (T-R)', () => {
+  const vendorRow = (id: string) => ({ id, name: `Vendor ${id}` });
+
+  it('one summary audit event with the same text bulkSave records; only the module key and the audit key are written', () => {
+    const repoA = createLocalRepo<{ id: string; name: string }>({ key: 'infosec.test.v1', seed: [], idPrefix: 'TST', entity: 'Vendor' });
+    store('infosec.test.v1', []);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const outcome = repoA.importNew([vendorRow('TST-001'), vendorRow('TST-002')]);
+    expect(outcome.kind).toBe('committed');
+    expect(setItem.mock.calls.map(([k]) => k)).toEqual(['infosec.test.v1', AUDIT_KEY]);
+    setItem.mockRestore();
+    const viaImport = auditView(auditLog.list());
+
+    localStorage.clear();
+    store('infosec.test.v1', []);
+    repoA.bulkSave([vendorRow('TST-001'), vendorRow('TST-002')]);
+    expect(viaImport).toEqual(auditView(auditLog.list()));
+    expect(viaImport[0].summary).toBe('Imported 2 Vendors from CSV (2 new, 0 updated)');
+  });
+
+  it('a missing module key is REJECTED and NOT seeded (read() is never used)', () => {
+    const repoB = createLocalRepo<{ id: string; name: string }>({ key: 'infosec.test2.v1', seed: [vendorRow('TST-099')], idPrefix: 'TST', entity: 'Vendor' });
+    const outcome = expectZeroWrites(() => repoB.importNew([vendorRow('TST-001')]));
+    expect(outcome.kind).toBe('rejected');
+    expect(localStorage.getItem('infosec.test2.v1')).toBeNull();
+    expect(expectZeroWrites(() => repoB.readForImport())).toEqual({ status: 'missing' });
+  });
+});
+
+type StoreApiView = ReturnType<typeof useStore>;
+/** Mount the REAL AppStoreProvider (normal app start) and expose its live API. */
+async function mountStore(): Promise<{ api: () => StoreApiView }> {
+  let current: StoreApiView | null = null;
+  function Probe() {
+    const s = useStore();
+    useEffect(() => { current = s; });
+    return null;
+  }
+  render(createElement(AppStoreProvider, null, createElement(Probe)));
+  await waitFor(() => expect(current?.loaded).toBe(true));
+  return { api: () => current! };
+}
+
+describe('Step 3: AppStore.importNew — state refreshed only from storage read-backs (T-R)', () => {
+  it('COMMITTED: store.assets equals the verified stored records; no listX call; only target + audit written', async () => {
+    const { api } = await mountStore(); // seeds the demo data through the normal app start
+    const lists = [vi.spyOn(appRepo, 'listAssets'), vi.spyOn(appRepo, 'listRisks'), vi.spyOn(appRepo, 'listTreatments')];
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const nextId = `AST-${String(api().assets.length + 1).padStart(3, '0')}`;
+    let outcome: ImportOutcome | null = null;
+    await act(async () => { outcome = await api().importNew('assets', [asset(nextId, { name: 'Imported' })]); });
+    expect(outcome!.kind).toBe('committed');
+    expect(setItem.mock.calls.map(([k]) => k)).toEqual([ASSETS_KEY, AUDIT_KEY]);
+    lists.forEach((s) => expect(s).not.toHaveBeenCalled());
+    expect(api().assets).toEqual(JSON.parse(localStorage.getItem(ASSETS_KEY)!));
+    expect(api().assets[api().assets.length - 1].name).toBe('Imported');
+  });
+
+  it('REJECTED: the store state is left exactly as it was', async () => {
+    const { api } = await mountStore();
+    const before = api().assets;
+    store(AUDIT_KEY, '{}'); // fails the audit pre-flight
+    let outcome: ImportOutcome | null = null;
+    await act(async () => { outcome = await api().importNew('assets', [asset('AST-999')]); });
+    expect(outcome!.kind).toBe('rejected');
+    expect(api().assets).toBe(before);
+  });
+
+  it('UNCERTAIN with an unreadable re-read: the store keeps its previous state', async () => {
+    const { api } = await mountStore();
+    const before = api().assets;
+    vi.spyOn(appRepo, 'importNew').mockResolvedValue({ kind: 'uncertain', reason: 'x', refresh: { status: 'missing' } });
+    await act(async () => { await api().importNew('assets', [asset('AST-999')]); });
+    expect(api().assets).toBe(before);
+  });
+});
+
+// ── Step 3 correction: malformed recovery read-backs (Codex S2 step 3 review) ─
+// After an UNCERTAIN write the refresh re-reads storage. A malformed collection
+// must be reported "unreadable" (never adopted into state), the outcome must stay
+// UNCERTAIN, and nothing else is written, seeded or migrated.
+/** setItem that leaves `left` in `key` and then throws: an UNCERTAIN data write. */
+function uncertainWriteLeaving(key: string, left: string) {
+  return vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+    if (k === key) {
+      originalSetItem.call(this, k, left);
+      throw new Error('late failure');
+    }
+    originalSetItem.call(this, k, v);
+  });
+}
+
+describe('Step 3 correction: malformed recovery read-backs are unreadable, never adopted', () => {
+  it.each([
+    ['[null]', '[null]'],
+    ['an entry without an id', '[{"id":"AST-001"},{"name":"no id"}]'],
+    ['a numeric id', '[{"id":1}]'],
+    ['a string entry', '["AST-001"]'],
+    ['a nested array', '[[]]'],
+  ])('readForImport: %s → unreadable, without writing', (_label, raw) => {
+    store(ASSETS_KEY, raw);
+    expect(expectZeroWrites(() => readForImport(ASSETS_KEY))).toEqual({ status: 'unreadable' });
+  });
+
+  it('UNCERTAIN asset import with a malformed read-back keeps the previous store state; no retry, no audit, no other write', async () => {
+    const { api } = await mountStore();
+    const before = api().assets;
+    const lists = [vi.spyOn(appRepo, 'listAssets'), vi.spyOn(appRepo, 'listRisks'), vi.spyOn(appRepo, 'listTreatments')];
+    const setItem = uncertainWriteLeaving(ASSETS_KEY, '[null]');
+    let outcome: ImportOutcome | null = null;
+    await act(async () => { outcome = await api().importNew('assets', [asset('AST-999')]); });
+    expect(outcome).toMatchObject({ kind: 'uncertain', refresh: { status: 'unreadable' } });
+    expect(api().assets, 'previous state kept, [null] never adopted').toBe(before);
+    expect(setItem.mock.calls.map(([k]) => k), 'one data write attempt; no audit, no seed, no retry').toEqual([ASSETS_KEY]);
+    lists.forEach((s) => expect(s, 'no listX (no seeding or migration)').not.toHaveBeenCalled());
+    expect(outcomeMessage(outcome!, 'assets')).toMatch(/could not be read back/);
+  });
+
+  it('UNCERTAIN risk import with a malformed read-back reports UNCERTAIN; the display adapter cannot throw or hide it', async () => {
+    for (const left of ['[null]', '[{"id":"RSK-001","assetId":"AST-001"},{"assetId":"AST-002"}]']) {
+      localStorage.clear();
+      store(ASSETS_KEY, [asset('AST-001')]);
+      store(RISKS_KEY, []);
+      store(TREATMENTS_KEY, []);
+      const setItem = uncertainWriteLeaving(RISKS_KEY, left);
+      const repo = new LocalStorageRepo();
+      let outcome: ImportOutcome | null = null;
+      await expect((async () => { outcome = await repo.importNew('risks', [risk('RSK-001')]); })()).resolves.toBeUndefined();
+      expect(outcome, left).toMatchObject({ kind: 'uncertain', refresh: { status: 'unreadable' } });
+      expect(setItem.mock.calls.map(([k]) => k)).toEqual([RISKS_KEY]);
+      expect(localStorage.getItem(RISKS_KEY), 'left exactly as found: no rollback, no repair').toBe(left);
+      setItem.mockRestore();
+    }
+  });
+
+  it('migrateRisk is a display adapter only: a VALID legacy read-back after an UNCERTAIN write is shown migrated, storage keeps the legacy fields, the outcome stays UNCERTAIN', async () => {
+    store(ASSETS_KEY, [asset('AST-001')]);
+    store(RISKS_KEY, []);
+    store(TREATMENTS_KEY, []);
+    const legacy = '[{"id":"RSK-001","assetId":"AST-001","actionPlan":"Keep me","threat":"DDoS"}]';
+    const setItem = uncertainWriteLeaving(RISKS_KEY, legacy);
+    const outcome = await new LocalStorageRepo().importNew('risks', [risk('RSK-002')]);
+    expect(outcome.kind).toBe('uncertain');
+    const shown = outcome.kind === 'uncertain' && outcome.refresh.status === 'ok' ? (outcome.refresh.records as Risk[]) : [];
+    expect(shown).toEqual([{ id: 'RSK-001', assetIds: ['AST-001'], threat: 'DDoS' }]);
+    expect(setItem.mock.calls.map(([k]) => k), 'the display conversion writes nothing').toEqual([RISKS_KEY]);
+    expect(localStorage.getItem(RISKS_KEY), 'raw legacy record untouched in storage').toBe(legacy);
   });
 });
