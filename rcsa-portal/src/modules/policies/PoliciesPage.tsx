@@ -206,7 +206,7 @@ export function PoliciesPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search documents…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--link)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        <ImportExport spec={policyIo} exportSource={rows} existing={docs} canImport={perms.create} canExport={perms.export} onImported={(items) => setDocs(policyRepo.bulkSave(items))} />
+        <ImportExport spec={policyIo} exportSource={rows} existing={docs} canImport={perms.create} canExport={perms.export} repo={policyRepo} onRefreshed={setDocs} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Document</button>}
       </div>

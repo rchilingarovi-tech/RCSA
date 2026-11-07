@@ -263,7 +263,7 @@ export function VulnsPage() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search vulnerabilities…" className="border rounded-lg px-3 py-2 text-sm" style={{ maxWidth: 280, background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }} />
         {filter.active && <button onClick={filter.clear} className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border" style={{ color: 'var(--link)', borderColor: 'var(--accent)' }}>Filtered: {filter.active.label} ✕</button>}
         <div className="flex-1" />
-        <ImportExport spec={vulnIo} exportSource={rows} existing={vulns} canImport={perms.create} canExport={perms.export} onImported={(items) => setVulns(vulnRepo.bulkSave(items))} />
+        <ImportExport spec={vulnIo} exportSource={rows} existing={vulns} canImport={perms.create} canExport={perms.export} repo={vulnRepo} onRefreshed={setVulns} />
         {perms.remove && <button onClick={resetDemo} className="btn-neutral bg-white border px-3 py-2 rounded-lg text-sm font-medium">Reset demo data</button>}
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">+ New Vulnerability</button>}
       </div>

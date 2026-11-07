@@ -1,13 +1,14 @@
 # Record ID integrity: design (Milestone 4)
 
-**Status:** design revision 3, **accepted by Codex** (`review-mw4r4axe-3lynff`). **Stage S1 is complete**: reviewed by Codex (ACCEPT) and merged into `develop` at `0793830` (PR #4, commit `061bb35`; see §0). Stages S2–S6 are **not implemented**; each needs separate approval. Rules: [`../AGENTS.md`](../AGENTS.md). Project state: [`DEVELOPMENT_STATUS.md`](DEVELOPMENT_STATUS.md).
+**Status:** design revision 3, **accepted by Codex** (`review-mw4r4axe-3lynff`). **Stage S1 is complete**: reviewed by Codex (ACCEPT) and merged into `develop` at `0793830` (PR #4, commit `061bb35`; see §0). **Stage S2 is implemented on `feature/v1-import-id-integrity` (not merged; final branch review pending)** as create-only CSV imports, per [`ID_INTEGRITY_S2_DESIGN.md`](ID_INTEGRITY_S2_DESIGN.md). Stages S3–S6 are **not implemented**; each needs separate approval. Rules: [`../AGENTS.md`](../AGENTS.md). Project state: [`DEVELOPMENT_STATUS.md`](DEVELOPMENT_STATUS.md).
 
 ## 0. Implementation status and decisions
 
 | Stage | Status |
 |---|---|
 | **S1. One safe allocator** | **Completed.** Reviewed by Codex (final verdict ACCEPT, `review-mw4s0k34-cyg35x`) and merged into `develop` at `0793830` (PR #4, commit `061bb35`). A new shared allocator, `src/data/ids.ts`, is used by: `genId` (the Asset, Risk and Treatment forms); `createLocalRepo.nextId` (11 modules); both CSV importers (`io/import.ts`, `lib/tableIo.ts`); and the legacy treatment migration. All 14 create forms handle allocation errors. D1 is fixed and its 3 known-defect tests are now ordinary regression tests. R11 is fixed. **R15 stays open**, pinned as 2 known-defect tests. Regression tests: `src/data/ids.test.tsx` and `src/test/regressions/id-collision.test.ts`. |
-| S2–S6 | Not started. Each needs separate approval. |
+| **S2. Exact identity in imports** | **Implemented on `feature/v1-import-id-integrity`, not merged** (design: `docs/ID_INTEGRITY_S2_DESIGN.md` revision 6.1, accepted by Codex; four separately approved and Codex-reviewed steps). The user chose a **create-only** architecture: CSV import creates new records only, every ID comes from the S1 allocator, and any non-blank ID cell blocks the file. CSV updates of existing records are deferred until the export/import data-loss defects are fixed. So **R3 and R4 are removed by construction** for imports (no explicit or duplicate IDs), **R12 is addressed** for references (exact, fail-closed, ambiguous groups rejected), and **R8 is addressed** by a commit-time recheck (allocated IDs still free; B-3 parent revalidation) with zero writes on refusal, one checked append-only write and a checked audit batch (five reported outcomes; no rollback, no atomicity claim). Not covered: another tab writing between the check and the write (R7). |
+| S3–S6 | Not started. Each needs separate approval. |
 
 **User decisions recorded on 2026-11-06 for later stages (not implemented):**
 - **D-1:** IDs should **never be reused, including after demo resets**. First resolve how the seeded IDs and a preserved counter coexist. For example, after a reset the seed brings back `AST-001…AST-100`, while the counter may already be beyond them.

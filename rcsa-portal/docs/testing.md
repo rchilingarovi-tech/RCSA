@@ -9,7 +9,7 @@ Tests never change application behaviour: they only import and exercise it.
 | Command | What it does | Expected result today |
 |---|---|---|
 | `npm test` | Normal run. Ordinary tests plus known-defect tests (see below). | **All green.** |
-| `npm run test:defects` | Defect mode. Each known defect runs its scenario, its invariants and its correct-behaviour assertion as an ordinary test, so the real assertion failure (the evidence of each bug) is printed. | **Exactly the known defects fail** (currently 17); everything else passes. A non-zero exit code is expected here. |
+| `npm run test:defects` | Defect mode. Each known defect runs its scenario, its invariants and its correct-behaviour assertion as an ordinary test, so the real assertion failure (the evidence of each bug) is printed. | **Exactly the known defects fail** (currently 18); everything else passes. A non-zero exit code is expected here. |
 | `npm run test:watch` | Watch mode for local development. | — |
 | `npm run build` | Type-checks application **and** test files (`tsc --noEmit`, strict), then builds. Test code is never bundled, and test files are excluded from Tailwind's class scan (`tailwind.config.js`), so they cannot change the production CSS. | Green. |
 
@@ -61,7 +61,7 @@ assertions with a *correct* allocator. A real fix would therefore flip those
 tests to "no longer reproduces". The invariants also check that the new record
 is persisted exactly once, exactly as created.
 
-### Current known defects (17 scenarios, 7 root causes)
+### Current known defects (18 scenarios, 8 root causes)
 
 | Root cause | Scenarios | File |
 |---|---|---|
@@ -69,7 +69,8 @@ is persisted exactly once, exactly as created.
 | Editing a risk drops its custom (non-catalogue) controls | 1 | `src/test/regressions/custom-controls.test.tsx` |
 | RCSA CSV import: invalid Yes/No asset flags silently become "No" | 5 | `src/io/import.test.ts` |
 | RCSA CSV import: invalid inherent/residual scores silently become 1 / "not assessed" | 4 | `src/io/import.test.ts` |
-| Risk CSV export → import loses scores and keeps the formula-guard apostrophe | 2 | `src/io/import.test.ts` |
+| Risk CSV export → import loses scores and keeps the formula-guard apostrophe (D5). Since ID-integrity S2 import is create-only, so the specs observe the export **with its ID column cleared**, imported as a new record (`RSK-002`); identity is asserted in the invariant and scores are compared without IDs. **Not fixed**: removing the update path removed one way to trigger it. | 2 | `src/io/import.test.ts` |
+| Treatment CSV export writes the computed `Overdue` status, which the import rejects, so an overdue treatment cannot be re-entered and its stored status is lost (D9) | 1 | `src/io/import.test.ts` |
 | KPI history: blank entries parse as 0 data points | 2 | `src/modules/kpis/kpis.test.ts` |
 | Storage write failures are swallowed: on a fresh install, if **only** the treatment-seed write fails, treatments still initialise empty. This is the limit left by the treatment-initialisation fix. | 1 | `src/test/regressions/treatment-initialization.test.tsx` |
 
