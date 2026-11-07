@@ -4,9 +4,9 @@
 //   • src/test/helpers.test.ts   — negative self-tests that feed the SAME specs
 //                                  wrong observations and prove they are rejected
 import { expect, vi } from 'vitest';
-import type { Asset, Risk } from '../../data/models';
-import { parseAssetsFile, parseRisksFile, type ImportResult } from '../../io/import';
-import { exportRisksCsv } from '../../csv/export';
+import type { Asset, Risk, Treatment } from '../../data/models';
+import { parseAssetsFile, parseRisksFile, parseTreatmentsFile, type ImportResult } from '../../io/import';
+import { exportRisksCsv, exportTreatmentsCsv } from '../../csv/export';
 import { csvFile, type DefectSpec } from '../helpers';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -26,19 +26,68 @@ export function risk(id: string, over: Partial<Risk> = {}): Risk {
   };
 }
 
-/** Capture the CSV text the Risk exporter would download (no file is written). */
-export async function captureRiskExport(risks: Risk[], assets: Asset[]): Promise<string> {
+/** Capture the CSV text an exporter would download (no file is written). */
+async function captureExport(run: () => void): Promise<string> {
   let blob: Blob | null = null;
   const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => { blob = b as Blob; return 'blob:test'; });
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   try {
-    exportRisksCsv(risks, assets, []);
+    run();
   } finally {
     create.mockRestore();
     click.mockRestore();
   }
   if (!blob) throw new Error('exporter did not produce a file');
   return (blob as Blob).text();
+}
+
+/** Capture the CSV text the Risk exporter would download (no file is written). */
+export function captureRiskExport(risks: Risk[], assets: Asset[]): Promise<string> {
+  return captureExport(() => exportRisksCsv(risks, assets, []));
+}
+
+/** Capture the CSV text the Treatment exporter would download (no file is written). */
+export function captureTreatmentExport(treatments: Treatment[]): Promise<string> {
+  return captureExport(() => exportTreatmentsCsv(treatments));
+}
+
+/**
+ * Blank every cell under `header` in an exporter-produced CSV (every field
+ * quoted, "" escapes, LF records, optional BOM) and re-quote every field the way
+ * the exporter does. Used because CSV import is create-only (ID integrity S2):
+ * an export can only be imported as NEW records once its ID column is cleared.
+ * Throws if the text is not in the exporter's fully-quoted shape.
+ */
+export function withIdColumnCleared(csv: string, header: string): string {
+  const bom = csv.startsWith('﻿') ? '﻿' : '';
+  const text = bom ? csv.slice(1) : csv;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== '"') throw new Error(`withIdColumnCleared: unquoted field at offset ${i}`);
+    let value = '';
+    i++;
+    for (;;) {
+      if (i >= text.length) throw new Error('withIdColumnCleared: unclosed quote');
+      if (text[i] === '"') {
+        if (text[i + 1] === '"') { value += '"'; i += 2; continue; }
+        i++;
+        break;
+      }
+      value += text[i++];
+    }
+    row.push(value);
+    if (text[i] === ',') { i++; continue; }
+    rows.push(row);
+    row = [];
+    if (text[i] === '\n') i++;
+    else if (i < text.length) throw new Error(`withIdColumnCleared: unexpected character at offset ${i}`);
+  }
+  const col = rows[0]?.indexOf(header) ?? -1;
+  if (col === -1) throw new Error(`withIdColumnCleared: no "${header}" column`);
+  rows.slice(1).forEach((r) => { r[col] = ''; });
+  return bom + rows.map((r) => r.map((v) => `"${v.replaceAll('"', '""')}"`).join(',')).join('\n');
 }
 
 /** Every data row is either imported or reported — never silently discarded. */
@@ -118,29 +167,43 @@ export function invalidScoreDefect(col: ScoreColumn, val: string): DefectSpec<Im
 }
 
 // ── Risk export → import round trip ──────────────────────────────────────────
-// The importer header promises it "round-trips with the CSV export".
+// Since ID integrity S2, CSV import is CREATE-ONLY: an export can no longer be
+// re-imported as an update. D5 is therefore observed on the remaining path —
+// the export with its ID column cleared, imported as a NEW record next to the
+// original. The defect lives in the export/import transformation and is NOT
+// fixed by removing the update path.
 
 export const ROUND_TRIP_ASSETS = [asset('AST-001')];
 
-/** The re-import must be a clean, single update of the same risk. Holds before AND after a fix. */
-function expectCleanSingleUpdate(r: ImportResult<Risk>, id: string): void {
+/** The copied risk is ONE clean create with the next allocated ID. Holds before AND after a fix. */
+function expectCleanSingleCreate(r: ImportResult<Risk>, id: string, assetIds: string[]): void {
   expect(r.errors, 'no import errors').toEqual([]);
   expect(r.rows, 'exactly one imported row').toHaveLength(1);
-  expect(r.rows[0].id, 'the row is the exported risk').toBe(id);
-  expect({ updated: r.updated, created: r.created, skipped: r.skipped }, 'recognised as an update').toEqual({ updated: 1, created: 0, skipped: 0 });
+  expect(r.rows[0].id, 'the row is a NEW risk with the next allocated ID').toBe(id);
+  expect(r.rows[0].assetIds, 'linked to the same assets as the original').toEqual(assetIds);
+  expect({ updated: r.updated, created: r.created, skipped: r.skipped }, 'recognised as a create').toEqual({ updated: 0, created: 1, skipped: 0 });
 }
+
+/** Scores only — independent of the generated record ID (identity is asserted in the invariant). */
+const scoreFields = (x: Risk) => ({
+  impact: x.impact, likelihood: x.likelihood,
+  resImpact: x.resImpact ?? null, resLikelihood: x.resLikelihood ?? null,
+});
+
+const copiedRiskExport = async (original: Risk) =>
+  csvFile(withIdColumnCleared(await captureRiskExport([original], ROUND_TRIP_ASSETS), 'Risk ID'));
 
 // Defect: the export writes only computed "Inherent Score"/"Residual Score"
 // columns, not Impact / Likelihood / Residual Impact / Residual Likelihood, so the
-// re-import resets them to 1 / 1 / not assessed.
+// import resets them to 1 / 1 / not assessed.
 export function roundTripScoresDefect(): DefectSpec<ImportResult<Risk>> {
   const original = risk('RSK-001', { impact: 5, likelihood: 4, resImpact: 3, resLikelihood: 2 });
   return {
-    observe: async () => parseRisksFile(csvFile(await captureRiskExport([original], ROUND_TRIP_ASSETS)), [original], ROUND_TRIP_ASSETS),
-    invariants: (r) => expectCleanSingleUpdate(r, original.id),
-    correct: (r) => expect(scoreView(r.rows[0])).toEqual(scoreView(original)),
-    symptom: (r) => r.rows.map(scoreView),
-    documented: [{ id: 'RSK-001', impact: 1, likelihood: 1, resImpact: null, resLikelihood: null }],
+    observe: async () => parseRisksFile(await copiedRiskExport(original), [original], ROUND_TRIP_ASSETS),
+    invariants: (r) => expectCleanSingleCreate(r, 'RSK-002', original.assetIds),
+    correct: (r) => expect(scoreFields(r.rows[0])).toEqual(scoreFields(original)),
+    symptom: (r) => r.rows.map(scoreFields),
+    documented: [{ impact: 1, likelihood: 1, resImpact: null, resLikelihood: null }],
   };
 }
 
@@ -149,10 +212,41 @@ export function roundTripScoresDefect(): DefectSpec<ImportResult<Risk>> {
 export function roundTripApostropheDefect(): DefectSpec<ImportResult<Risk>> {
   const original = risk('RSK-001', { threat: '-Legacy VPN exposure' });
   return {
-    observe: async () => parseRisksFile(csvFile(await captureRiskExport([original], ROUND_TRIP_ASSETS)), [original], ROUND_TRIP_ASSETS),
-    invariants: (r) => expectCleanSingleUpdate(r, original.id),
+    observe: async () => parseRisksFile(await copiedRiskExport(original), [original], ROUND_TRIP_ASSETS),
+    invariants: (r) => expectCleanSingleCreate(r, 'RSK-002', original.assetIds),
     correct: (r) => expect(r.rows[0].threat).toBe('-Legacy VPN exposure'),
     symptom: (r) => r.rows.map((x) => x.threat),
     documented: ["'-Legacy VPN exposure"],
+  };
+}
+
+// ── D9: treatment export → import ("Overdue") ────────────────────────────────
+// Defect: the treatment export writes the COMPUTED status (treatmentStatus →
+// "Overdue" when past due), which is not an importable status, so the stored
+// status is lost and the row is rejected. Observed on the create-only path
+// (ID column cleared). Unresolved; pinned by decision D5-2.
+
+export const D9_RISKS = [risk('RSK-001')];
+
+export function treatmentOverdueRoundTripDefect(): DefectSpec<ImportResult<Treatment>> {
+  const original: Treatment = {
+    id: 'TRT-001', riskIds: ['RSK-001'], title: 'Patch VPN', description: '', owner: 'SecOps',
+    dueDate: '2020-01-31', status: 'In Progress', evidence: [], comments: [], submittedAt: '2025-01-01',
+  };
+  return {
+    observe: async () =>
+      parseTreatmentsFile(
+        csvFile(withIdColumnCleared(await captureTreatmentExport([original]), 'Treatment ID')),
+        [original],
+        D9_RISKS,
+      ),
+    invariants: (r) => expectRowAccountedFor(r),
+    correct: (r) => {
+      expect(r.errors).toEqual([]);
+      expect(r.rows.map((t) => [t.id, t.status])).toEqual([['TRT-002', 'In Progress']]);
+    },
+    symptom: (r) => ({ rows: r.rows.map((t) => t.status), errors: r.errors, skipped: r.skipped }),
+    // Exactly today's wrong behaviour: the exported "Overdue" is rejected, nothing is importable.
+    documented: { rows: [], errors: [{ row: 2, field: 'Status', message: 'must be: Open, In Progress, Completed' }], skipped: 1 },
   };
 }

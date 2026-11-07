@@ -9,6 +9,8 @@ import {
 } from 'react';
 import type { Asset, Risk, Treatment } from '../data/models';
 import { repo } from '../data';
+import type { RcsaImportCollections } from '../data/repository';
+import type { ImportOutcome } from '../data/importCommit';
 import {
   EMPTY_ASSET_FILTERS,
   EMPTY_RISK_FILTERS,
@@ -112,10 +114,13 @@ interface StoreApi extends State {
   saveTreatment(treatment: Treatment): Promise<void>;
   deleteTreatment(id: string): Promise<void>;
   resetDemoData(): Promise<void>;
-  // bulk upsert (spreadsheet import) — writes through the repo, reloads once
-  importAssets(assets: Asset[]): Promise<void>;
-  importRisks(risks: Risk[]): Promise<void>;
-  importTreatments(treatments: Treatment[]): Promise<void>;
+  /**
+   * ID integrity S2 — create-only CSV import (the only import path; used by
+   * ImportModal). State is refreshed ONLY from the outcome's storage read-back (verified
+   * write, or the read-only re-read after an uncertain write); a rejected or
+   * unreadable outcome leaves the state as it was. Never calls listX().
+   */
+  importNew<K extends keyof RcsaImportCollections>(collection: K, rows: RcsaImportCollections[K][]): Promise<ImportOutcome>;
   // navigation / filter ops
   selectAsset(id: string): void;
   clearSelection(): void;
@@ -194,19 +199,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     dispatch({ kind: 'setData', assets, risks, treatments });
   }, []);
 
-  const importAssets = useCallback(async (assets: Asset[]) => {
-    for (const a of assets) await repo.saveAsset(a);
-    dispatch({ kind: 'setAssets', assets: await repo.listAssets() });
-  }, []);
-
-  const importRisks = useCallback(async (risks: Risk[]) => {
-    for (const r of risks) await repo.saveRisk(r);
-    dispatch({ kind: 'setRisks', risks: await repo.listRisks() });
-  }, []);
-
-  const importTreatments = useCallback(async (treatments: Treatment[]) => {
-    for (const t of treatments) await repo.saveTreatment(t);
-    dispatch({ kind: 'setTreatments', treatments: await repo.listTreatments() });
+  const importNew = useCallback(async <K extends keyof RcsaImportCollections>(collection: K, rows: RcsaImportCollections[K][]) => {
+    const outcome = await repo.importNew(collection, rows);
+    const records =
+      outcome.kind === 'rejected' ? null
+        : outcome.kind === 'uncertain' ? (outcome.refresh.status === 'ok' ? outcome.refresh.records : null)
+          : outcome.records;
+    if (records) {
+      if (collection === 'assets') dispatch({ kind: 'setAssets', assets: records as Asset[] });
+      else if (collection === 'risks') dispatch({ kind: 'setRisks', risks: records as Risk[] });
+      else dispatch({ kind: 'setTreatments', treatments: records as Treatment[] });
+    }
+    return outcome;
   }, []);
 
   const api = useMemo<StoreApi>(
@@ -219,9 +223,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       saveTreatment,
       deleteTreatment,
       resetDemoData,
-      importAssets,
-      importRisks,
-      importTreatments,
+      importNew,
       selectAsset: (id) => dispatch({ kind: 'selectAsset', id }),
       clearSelection: () => dispatch({ kind: 'clearSelection' }),
       setGlobalFilter: (filter) => dispatch({ kind: 'setGlobalFilter', filter }),
@@ -231,7 +233,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       clearAssetFilters: () => dispatch({ kind: 'clearAssetFilters' }),
       patchRiskFilters: (patch) => dispatch({ kind: 'patchRiskFilters', patch }),
     }),
-    [state, saveAsset, deleteAsset, saveRisk, deleteRisk, saveTreatment, deleteTreatment, resetDemoData, importAssets, importRisks, importTreatments],
+    [state, saveAsset, deleteAsset, saveRisk, deleteRisk, saveTreatment, deleteTreatment, resetDemoData, importNew],
   );
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;

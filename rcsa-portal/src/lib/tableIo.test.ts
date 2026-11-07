@@ -44,17 +44,26 @@ describe('importCsvText (Vendor spec)', () => {
     expect(r.rows[0]).toMatchObject({ score: 10, certs: ['PCI-DSS'] });
   });
 
-  it('requires Name on NEW rows only', () => {
-    const r = importCsvText(vendorIo, 'ID,Name,Residual score\n,,50\nVEN-03,,60\n', [vendor('VEN-03')]);
-    expect(r.errors).toEqual([{ row: 2, field: 'Name', message: 'Name is required' }]);
-    expect(r.rows).toHaveLength(1);
-    expect(r.rows[0]).toMatchObject({ id: 'VEN-03', name: 'Vendor VEN-03', score: 60 });
+  // S2 (create-only): was "requires Name on NEW rows only". Every row is new now,
+  // so Name is required on every row; the explicit VEN-03 row is blocked (design §9.2 #8).
+  it('requires Name on every row (all rows are new); an explicit ID row is blocked', () => {
+    const r = importCsvText(vendorIo, 'ID,Name,Residual score\n,,50\nVEN-03,,60\n,Acme,70\n', [vendor('VEN-03')]);
+    expect(r.errors).toEqual([
+      { row: 2, field: 'Name', message: 'Name is required' },
+      { row: 3, field: 'ID', message: expect.stringMatching(/creates new records only/) },
+      { row: 3, field: 'Name', message: 'Name is required' },
+    ]);
+    expect(r.rows.map((v) => [v.id, v.name])).toEqual([['VEN-04', 'Acme']]);
+    expect(r.updated).toBe(0);
   });
 
-  it('blank cells on an update keep the existing values', () => {
-    const r = importCsvText(vendorIo, 'ID,Name,Criticality,Residual score\nven-03,,,\n', [vendor('VEN-03')]);
-    expect(r.updated).toBe(1);
-    expect(r.rows[0]).toEqual(vendor('VEN-03'));
+  // S2 (create-only): was "blank cells on an update keep the existing values".
+  // The update operation and its blank-keeps rule are retired (design §9.2 #9).
+  it('a non-blank ID (exact or case variant of a stored ID) blocks the row; nothing is updated', () => {
+    const r = importCsvText(vendorIo, 'ID,Name\nven-03,X\nVEN-03,Y\n', [vendor('VEN-03')]);
+    expect(r.rows).toEqual([]);
+    expect(r.updated).toBe(0);
+    expect(r.errors.map((e) => [e.row, e.field])).toEqual([[2, 'ID'], [3, 'ID']]);
   });
 
   it('reports invalid enum and out-of-range values with the row number', () => {
@@ -72,12 +81,19 @@ describe('importCsvText (Vendor spec)', () => {
     expect(r.rows[0].name).toBe('=HYPERLINK(1)');
   });
 
-  it('allocates ids after the highest number taken so far (existing + this file) and skips taken ones', () => {
+  // S2 (create-only): the explicit VEN-20 row of the old fixture is now a row
+  // error; allocation after the highest number is unchanged (design §9.2 #10).
+  it('allocates ids after the highest existing number', () => {
     const existing = [vendor('VEN-01'), vendor('VEN-09')];
-    const r = importCsvText(vendorIo, 'ID,Name\n,A\nVEN-20,B\n,C\n', existing);
-    // Since ID-integrity S1 the shared allocator also counts ids taken earlier
-    // in the same file, so the third row gets VEN-21 (was VEN-11; both unique).
-    expect(r.rows.map((v) => v.id)).toEqual(['VEN-10', 'VEN-20', 'VEN-21']);
+    const r = importCsvText(vendorIo, 'ID,Name\n,A\n,C\n', existing);
+    expect(r.errors).toEqual([]);
+    expect(r.rows.map((v) => v.id)).toEqual(['VEN-10', 'VEN-11']);
+  });
+
+  it('an explicit new ID (VEN-20) is rejected, not reserved', () => {
+    const r = importCsvText(vendorIo, 'ID,Name\n,A\nVEN-20,B\n,C\n', [vendor('VEN-01'), vendor('VEN-09')]);
+    expect(r.errors.map((e) => [e.row, e.field])).toEqual([[3, 'ID']]);
+    expect(r.rows.map((v) => v.id)).toEqual(['VEN-10', 'VEN-11']);
   });
 
   it('handles quoted fields, BOM, CRLF and blank lines', () => {

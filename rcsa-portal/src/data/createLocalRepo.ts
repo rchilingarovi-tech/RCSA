@@ -4,6 +4,7 @@
 // Migration-ready: swap this one factory for an HTTP/DB client later.
 import { auditLog, diffFields } from '../audit/auditLog';
 import { allocateId } from './ids';
+import { importNewRecords, readForImport, type ImportOutcome, type ReadForImport } from './importCommit';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
@@ -18,6 +19,15 @@ export interface LocalRepo<T> {
   reset(): T[];
   /** Next sequential id, e.g. "CTL-001", derived from the current set. */
   nextId(): string;
+  /**
+   * ID integrity S2 — CREATE-ONLY CSV import (import path only; save/bulkSave
+   * unchanged). Audit pre-flight, raw checks, one checked append-only write,
+   * one checked summary audit event; one of the five §4.5 outcomes. Never
+   * seeds or retries.
+   */
+  importNew(rows: T[]): ImportOutcome;
+  /** Read-only refresh source (raw read, no seeding, no writes). */
+  readForImport(): ReadForImport;
 }
 
 export function createLocalRepo<T extends { id: string }>(opts: {
@@ -128,6 +138,22 @@ export function createLocalRepo<T extends { id: string }>(opts: {
       // Shared safe allocator (data/ids.ts): never returns an ID already in the
       // collection; throws IdAllocationError at the numbering limit.
       return allocateId(idPrefix, read().map((x) => x.id), pad);
+    },
+    importNew(rows: T[]): ImportOutcome {
+      // Raw reads only (data/importCommit.ts) — never read(), which seeds a missing key.
+      return importNewRecords<T>({
+        target: { key, label: `${entity}s` },
+        rows,
+        // The same ONE summary event bulkSave records today (all rows are new).
+        auditEvents: (rs) => [{
+          action: 'create',
+          entity,
+          summary: `Imported ${rs.length} ${entity}${rs.length === 1 ? '' : 's'} from CSV (${rs.length} new, 0 updated)`,
+        }],
+      });
+    },
+    readForImport(): ReadForImport {
+      return readForImport(key);
     },
   };
 }

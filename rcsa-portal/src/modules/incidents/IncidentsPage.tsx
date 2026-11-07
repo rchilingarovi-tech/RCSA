@@ -60,7 +60,7 @@ export function IncidentsPage() {
   return (
     <>
       <PageHeader>
-        <ImportExport spec={incidentIo} exportSource={filtered} existing={incidents} canImport={perms.create} canExport={perms.export} onImported={(items) => setIncidents(incidentRepo.bulkSave(items))} />
+        <ImportExport spec={incidentIo} exportSource={filtered} existing={incidents} canImport={perms.create} canExport={perms.export} repo={incidentRepo} onRefreshed={setIncidents} />
         {perms.create && <button onClick={() => setEditing('new')} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow">+ Report Incident</button>}
         {perms.remove && (
           <button

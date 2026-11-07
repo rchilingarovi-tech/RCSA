@@ -26,7 +26,7 @@ const ASSET_HEADERS = [
 
 export function downloadAssetTemplate(): void {
   downloadCsv(`rcsa-assets-template-${today()}.csv`, ASSET_HEADERS, {
-    'Asset ID': '', // leave blank to auto-generate (AST-###); an existing ID updates that asset
+    'Asset ID': '', // must stay blank: import is create-only and IDs are auto-generated (AST-###)
     Name: 'Example Payroll Server',
     Process: 'Payroll',
     Department: 'Human Resources',

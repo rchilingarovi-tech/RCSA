@@ -1,9 +1,10 @@
 import type { Asset, Risk, Treatment, TreatmentStatus } from './models';
-import type { RcsaRepository } from './repository';
+import type { RcsaImportCollections, RcsaRepository } from './repository';
 import { SEED_ASSETS, SEED_RISKS, SEED_TREATMENTS } from './seed';
 import { today } from '../domain/scoring';
-import { auditLog, diffFields } from '../audit/auditLog';
+import { auditLog, diffFields, type AuditInput } from '../audit/auditLog';
 import { createIdAllocator } from './ids';
+import { importNewRecords, readForImport, type ImportOutcome, type ImportParent, type ImportTarget, type ReadForImport } from './importCommit';
 
 const ASSETS_KEY = 'rcsa.assets.v1';
 const RISKS_KEY = 'rcsa.risks.v1';
@@ -59,6 +60,30 @@ function deriveTreatments(legacy: LegacyRisk[]): Treatment[] {
     });
   });
   return out;
+}
+
+// ── ID integrity S2 import wiring (targets, parents for B-3) ─────────────────
+const IMPORT_TARGETS: Record<keyof RcsaImportCollections, ImportTarget> = {
+  assets: { key: ASSETS_KEY, label: 'Assets' },
+  risks: { key: RISKS_KEY, label: 'Risks' },
+  treatments: { key: TREATMENTS_KEY, label: 'Treatments', missingMessage: 'Treatments are not initialised in this browser. Nothing was imported.' },
+};
+const RISK_PARENT: ImportParent<Risk> = {
+  key: ASSETS_KEY, label: 'assets', labels: { parent: 'asset', column: 'Asset ID' }, refsOf: (r) => r.assetIds,
+};
+const TREATMENT_PARENT: ImportParent<Treatment> = {
+  key: RISKS_KEY, label: 'risks', labels: { parent: 'risk', column: 'Risk ID' }, refsOf: (t) => t.riskIds,
+};
+
+/** Risk read-backs are presented through migrateRisk IN MEMORY (as listRisks does); nothing is written. */
+function displayRisks(outcome: ImportOutcome): ImportOutcome {
+  if (outcome.kind === 'rejected') return outcome;
+  if (outcome.kind === 'uncertain') {
+    return outcome.refresh.status === 'ok'
+      ? { ...outcome, refresh: { status: 'ok', records: (outcome.refresh.records as LegacyRisk[]).map(migrateRisk) } }
+      : outcome;
+  }
+  return { ...outcome, records: (outcome.records as LegacyRisk[]).map(migrateRisk) };
 }
 
 /** Remove the given risk ids from every treatment; drop treatments left orphaned. */
@@ -231,6 +256,54 @@ export class LocalStorageRepo implements RcsaRepository {
     const treatments = (await this.listTreatments()).filter((t) => t.id !== id);
     this.write(TREATMENTS_KEY, treatments);
     auditLog.record({ action: 'delete', entity: 'Treatment', entityId: id, summary: `Deleted Treatment ${id}${removed ? ` — ${removed.title || 'Untitled'}` : ''}`, changes: removed ? diffFields(removed as unknown as Record<string, unknown>, {}) : undefined });
+  }
+
+  // ── ID integrity S2: create-only CSV import (import path only) ─────────────
+  // Uses data/importCommit.ts: raw reads only — never listX(), read(), the seed
+  // or the legacy migration — so no other key is written. Existing methods
+  // above are unchanged.
+
+  async importNew<K extends keyof RcsaImportCollections>(collection: K, rows: RcsaImportCollections[K][]): Promise<ImportOutcome> {
+    if (collection === 'assets') {
+      return importNewRecords<Asset>({
+        target: IMPORT_TARGETS.assets,
+        rows: rows as Asset[],
+        // Same events saveAsset records for a create (one per record).
+        auditEvents: (rs) => rs.map((a): AuditInput => ({
+          action: 'create', entity: 'Asset', entityId: a.id, summary: `Created Asset ${a.id} — ${a.name}`,
+          changes: diffFields({}, a as unknown as Record<string, unknown>),
+        })),
+      });
+    }
+    if (collection === 'risks') {
+      const outcome = importNewRecords<Risk>({
+        target: IMPORT_TARGETS.risks,
+        rows: rows as Risk[],
+        parent: RISK_PARENT,
+        auditEvents: (rs) => rs.map((r): AuditInput => ({
+          action: 'create', entity: 'Risk', entityId: r.id, summary: `Created Risk ${r.id} — ${r.threat}`,
+          changes: diffFields({}, r as unknown as Record<string, unknown>),
+        })),
+      });
+      return displayRisks(outcome);
+    }
+    return importNewRecords<Treatment>({
+      target: IMPORT_TARGETS.treatments,
+      rows: rows as Treatment[],
+      parent: TREATMENT_PARENT,
+      auditEvents: (rs) => rs.map((t): AuditInput => ({
+        action: 'create', entity: 'Treatment', entityId: t.id, summary: `Created Treatment ${t.id} — ${t.title || 'Untitled'}`,
+        changes: diffFields({}, t as unknown as Record<string, unknown>),
+      })),
+    });
+  }
+
+  async readForImport<K extends keyof RcsaImportCollections>(collection: K): Promise<ReadForImport> {
+    const r = readForImport(IMPORT_TARGETS[collection].key);
+    // Risks are displayed through migrateRisk IN MEMORY, exactly as listRisks()
+    // presents them today; nothing is written.
+    if (r.status === 'ok' && collection === 'risks') return { status: 'ok', records: (r.records as LegacyRisk[]).map(migrateRisk) };
+    return r;
   }
 
   async resetToSeed(): Promise<{ assets: Asset[]; risks: Risk[]; treatments: Treatment[] }> {
